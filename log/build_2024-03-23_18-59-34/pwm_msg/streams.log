@@ -1,0 +1,17 @@
+[0.326s] Invoking command in '/home/irl/robot_ws_virtual/build/pwm_msg': PYTHONPATH=/home/irl/robot_ws_virtual/build/pwm_msg/prefix_override:/home/irl/robot_ws_virtual/install/pwm_msg/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated setup.py develop --editable --build-directory /home/irl/robot_ws_virtual/build/pwm_msg/build --no-deps symlink_data
+[0.472s] running develop
+[0.547s] running egg_info
+[0.547s] writing pwm_msg.egg-info/PKG-INFO
+[0.547s] writing dependency_links to pwm_msg.egg-info/dependency_links.txt
+[0.547s] writing entry points to pwm_msg.egg-info/entry_points.txt
+[0.547s] writing requirements to pwm_msg.egg-info/requires.txt
+[0.547s] writing top-level names to pwm_msg.egg-info/top_level.txt
+[0.548s] reading manifest file 'pwm_msg.egg-info/SOURCES.txt'
+[0.549s] writing manifest file 'pwm_msg.egg-info/SOURCES.txt'
+[0.549s] running build_ext
+[0.549s] Creating /home/irl/robot_ws_virtual/install/pwm_msg/lib/python3.10/site-packages/pwm-msg.egg-link (link to .)
+[0.550s] Installing pwm_publisher script to /home/irl/robot_ws_virtual/install/pwm_msg/lib/pwm_msg
+[0.550s] 
+[0.550s] Installed /home/irl/robot_ws_virtual/build/pwm_msg
+[0.550s] running symlink_data
+[0.565s] Invoked command in '/home/irl/robot_ws_virtual/build/pwm_msg' returned '0': PYTHONPATH=/home/irl/robot_ws_virtual/build/pwm_msg/prefix_override:/home/irl/robot_ws_virtual/install/pwm_msg/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated setup.py develop --editable --build-directory /home/irl/robot_ws_virtual/build/pwm_msg/build --no-deps symlink_data

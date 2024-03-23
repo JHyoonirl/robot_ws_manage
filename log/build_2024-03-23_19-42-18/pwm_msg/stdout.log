@@ -1,0 +1,16 @@
+running develop
+running egg_info
+writing pwm_msg.egg-info/PKG-INFO
+writing dependency_links to pwm_msg.egg-info/dependency_links.txt
+writing entry points to pwm_msg.egg-info/entry_points.txt
+writing requirements to pwm_msg.egg-info/requires.txt
+writing top-level names to pwm_msg.egg-info/top_level.txt
+reading manifest file 'pwm_msg.egg-info/SOURCES.txt'
+writing manifest file 'pwm_msg.egg-info/SOURCES.txt'
+running build_ext
+Creating /home/irl/KneeVirtualBox/robot_ws_virtual/install/pwm_msg/lib/python3.10/site-packages/pwm-msg.egg-link (link to .)
+Installing pwm_publisher script to /home/irl/KneeVirtualBox/robot_ws_virtual/install/pwm_msg/lib/pwm_msg
+
+Installed /home/irl/KneeVirtualBox/robot_ws_virtual/build/pwm_msg
+running symlink_data
+symbolically linking /home/irl/KneeVirtualBox/robot_ws_virtual/build/pwm_msg/resource/pwm_msg -> /home/irl/KneeVirtualBox/robot_ws_virtual/install/pwm_msg/share/ament_index/resource_index/packages

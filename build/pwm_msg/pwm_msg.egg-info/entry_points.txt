@@ -1,0 +1,3 @@
+[console_scripts]
+pwm_publisher = pwm_msg.pwm_publisher:main
+
