@@ -11,9 +11,9 @@ class PwmPublisher(Node):
         qos_profile = QoSProfile(depth=10)
         self.pwm_publisher = self.create_publisher(
             String,
-            'pwm_str',
+            'pwm_write',
             qos_profile)
-        self.timer = self.create_timer(1, self.publish_pwm)
+        self.timer = self.create_timer(0.01, self.publish_pwm)
         self.count = 0
 
     def publish_pwm(self):
