@@ -15,13 +15,18 @@ class PwmPublisher(Node):
             qos_profile)
         self.timer = self.create_timer(0.01, self.publish_pwm)
         self.count = 0
+        if self.count == 100:
+            self.count = 0
 
     def publish_pwm(self):
         msg = String()
-        msg.data = 'PWM: {0}'.format(self.count)
+        msg.data = str(self.count)
         self.pwm_publisher.publish(msg)
         self.get_logger().info('Published pwm: {0}'.format(msg.data))
-        self.count += 1
+        if self.count == 100:
+            self.count = 0
+        else:
+            self.count += 1
 
 
 def main(args=None):
