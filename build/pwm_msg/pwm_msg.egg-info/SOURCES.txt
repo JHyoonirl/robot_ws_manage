@@ -2,6 +2,7 @@ package.xml
 setup.cfg
 setup.py
 pwm_msg/__init__.py
+pwm_msg/keyboard_publisher.py
 pwm_msg/pwm_publisher.py
 pwm_msg.egg-info/PKG-INFO
 pwm_msg.egg-info/SOURCES.txt

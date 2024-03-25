@@ -20,7 +20,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'pwm_publisher = pwm_msg.pwm_publisher:main'
+            'pwm_publisher = pwm_msg.pwm_publisher:main',
+            'keyboard_publisher = pwm_msg.keyboard_publisher:main',
         ],
     },
 )
