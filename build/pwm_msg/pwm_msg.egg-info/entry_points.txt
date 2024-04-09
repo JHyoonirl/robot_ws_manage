@@ -1,4 +1,0 @@
-[console_scripts]
-keyboard_publisher = pwm_msg.keyboard_publisher:main
-pwm_publisher = pwm_msg.pwm_publisher:main
-

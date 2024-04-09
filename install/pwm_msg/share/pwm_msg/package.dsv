@@ -1,9 +1,0 @@
-source;share/pwm_msg/hook/pythonpath.ps1
-source;share/pwm_msg/hook/pythonpath.dsv
-source;share/pwm_msg/hook/pythonpath.sh
-source;share/pwm_msg/hook/ament_prefix_path.ps1
-source;share/pwm_msg/hook/ament_prefix_path.dsv
-source;share/pwm_msg/hook/ament_prefix_path.sh
-source;../../build/pwm_msg/share/pwm_msg/hook/pythonpath_develop.ps1
-source;../../build/pwm_msg/share/pwm_msg/hook/pythonpath_develop.dsv
-source;../../build/pwm_msg/share/pwm_msg/hook/pythonpath_develop.sh
