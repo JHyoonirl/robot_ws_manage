@@ -9,7 +9,7 @@ class PwmPublisher(Node):
     def __init__(self):
         super().__init__('pwm_publisher')
         qos_profile = QoSProfile(depth=10)
-        self.pwm = 7
+        self.pwm = 77
         self.pwm_key_subscriber = self.create_subscription(
             String,
             'keyboard_input',
@@ -29,6 +29,8 @@ class PwmPublisher(Node):
             self.pwm += 1
         elif msg.data =='s':
             self.pwm -= 1
+        elif msg.data == 'q':
+            self.pwm = 77
 
 
     def publish_pwm(self):
