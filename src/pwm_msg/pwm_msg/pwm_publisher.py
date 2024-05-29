@@ -9,7 +9,11 @@ class PwmPublisher(Node):
     def __init__(self):
         super().__init__('pwm_publisher')
         qos_profile = QoSProfile(depth=10)
-        self.pwm = 77
+        self.resolution = 16
+        self.pwm_range = pow(2,16)
+        # pwm initialize
+        self.pwm_neut = self.pwm_range * (0.075)
+        self.pwm = self.pwm_neut
         self.pwm_key_subscriber = self.create_subscription(
             String,
             'keyboard_input',
@@ -26,11 +30,11 @@ class PwmPublisher(Node):
 
     def pwm_order(self, msg):
         if msg.data == 'w':
-            self.pwm += 1
+            self.pwm += 5
         elif msg.data =='s':
-            self.pwm -= 1
+            self.pwm -= 5
         elif msg.data == 'q':
-            self.pwm = 77
+            self.pwm = self.pwm_neut
 
 
     def publish_pwm(self):
