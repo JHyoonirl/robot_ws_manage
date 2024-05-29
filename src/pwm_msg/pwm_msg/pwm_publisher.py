@@ -42,10 +42,6 @@ class PwmPublisher(Node):
         msg.data = str(self.pwm)
         self.pwm_publisher.publish(msg)
         self.get_logger().info('Published pwm: {0}'.format(msg.data))
-        # if self.count == 100:
-        #     self.count = 1
-        # else:
-        #     self.count += 1
 
 
 def main(args=None):
