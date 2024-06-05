@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
-from std_msgs.msg import String
+from std_msgs.msg import String, Float64
 
 
 class PwmPublisher(Node):
@@ -12,7 +12,7 @@ class PwmPublisher(Node):
         self.resolution = 16
         self.pwm_range = pow(2,16)
         # pwm initialize
-        self.pwm_neut = self.pwm_range * (0.075)
+        self.pwm_neut = int(self.pwm_range * (0.075))
         self.pwm = self.pwm_neut
         self.pwm_key_subscriber = self.create_subscription(
             String,
@@ -22,8 +22,8 @@ class PwmPublisher(Node):
         )
 
         self.pwm_publisher = self.create_publisher(
-            String,
-            'pwm_write',
+            Float64,
+            'pwm_signal',
             qos_profile)
         
         self.timer = self.create_timer(0.01, self.publish_pwm)
@@ -38,8 +38,8 @@ class PwmPublisher(Node):
 
 
     def publish_pwm(self):
-        msg = String()
-        msg.data = str(self.pwm)
+        msg = Float64()
+        msg.data = float(self.pwm)
         self.pwm_publisher.publish(msg)
         self.get_logger().info('Published pwm: {0}'.format(msg.data))
 
