@@ -10,9 +10,9 @@ class PwmPublisher(Node):
         super().__init__('pwm_publisher')
         qos_profile = QoSProfile(depth=10)
         self.resolution = 16
-        self.pwm_range = pow(2,16)
+        # self.pwm_range = pow(2,16)
         # pwm initialize
-        self.pwm_neut = int(self.pwm_range * (0.075))
+        self.pwm_neut = int(50)
         self.pwm = self.pwm_neut
         self.pwm_key_subscriber = self.create_subscription(
             String,
@@ -35,6 +35,11 @@ class PwmPublisher(Node):
             self.pwm -= 5
         elif msg.data == 'q':
             self.pwm = self.pwm_neut
+        
+        if self.pwm > 100:
+            self.pwm = 100
+        elif self.pwm < 0:
+            self.pwm = 0
 
 
     def publish_pwm(self):
