@@ -4,10 +4,10 @@ import time
 sensor = FTSensor(port='/dev/ttyUSB0')
 
 if sensor.ft_sensor_init():
-    sensor.ft_sensor_continues()
+    # sensor.ft_sensor_continues()
     old_time = time.time()
     while True:
-        
+        sensor.read_and_process_data()
         if sensor.decoded and (time.time() - old_time) > 0.05:
             # print(sensor.decoded)
             old_time = time.time()
