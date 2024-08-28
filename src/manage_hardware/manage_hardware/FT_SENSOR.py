@@ -24,9 +24,9 @@ class FTSensor:
         self.data_read = [0x0B, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00]
         try:
             self.send_data_without_read(self.data_bias)
-            time.sleep(0.01)
+            time.sleep(0.1)
             self.send_data_without_read(self.data_baudrate)
-            time.sleep(0.01)
+            time.sleep(0.1)
             self.send_data_without_read(self.data_filter)
             time.sleep(0.1)
             self.send_data_without_read(self.data_read)
@@ -41,8 +41,6 @@ class FTSensor:
         process_thread = threading.Thread(target=self.process_data)
         read_thread.start()
         process_thread.start()
-        read_thread.join()
-        process_thread.join()
 
 
     def read_serial_data(self):
@@ -65,10 +63,10 @@ class FTSensor:
 
                         self.decoded = self.decode_received_data(self.data_queue[:19])
                         if self.decoded:
+                            print(self.decoded)
                             self.data_queue = self.data_queue[19:]  # Remove processed data
                     else:
                         self.data_queue.pop(0)  # Remove the first byte and recheck in the next cycle
-            time.sleep(0.005)
 
     def decode_received_data(self, packet):
         ''' Decoding logic for received data packet. '''

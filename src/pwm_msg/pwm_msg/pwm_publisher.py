@@ -30,9 +30,9 @@ class PwmPublisher(Node):
 
     def pwm_order(self, msg):
         if msg.data == 'w':
-            self.pwm += 5
+            self.pwm += 1
         elif msg.data =='s':
-            self.pwm -= 5
+            self.pwm -= 1
         elif msg.data == 'q':
             self.pwm = self.pwm_neut
         
