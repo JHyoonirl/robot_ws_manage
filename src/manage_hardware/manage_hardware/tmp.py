@@ -47,20 +47,17 @@ class FTSensor:
 
     def process_data(self):
         ''' Thread to decode the data checking SOP and EOP. '''
-        self.time1 = time.time()
         while True:
             with self.lock:
                 if len(self.data_queue) >= 19:
                     # Check for SOP and EOP
                     if self.data_queue[0] == 0x55 and self.data_queue[18] == 0xAA:
-
                         decoded = self.decode_received_data(self.data_queue[:19])
                         if decoded:
-                            # print(decoded)
+                            print(decoded)
                             self.data_queue = self.data_queue[19:]  # Remove processed data
                     else:
                         self.data_queue.pop(0)  # Remove the first byte and recheck in the next cycle
-            time.sleep(0.005)
 
     def decode_received_data(self, packet):
         ''' Decoding logic for received data packet. '''
