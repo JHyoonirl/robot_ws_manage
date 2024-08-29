@@ -28,11 +28,11 @@ class VisualSensor(Node):
         self.timer = self.create_timer(0.1, self.update_graph)
 
     def listen_force(self, msg):
-        current_time = self.get_clock().now().nanoseconds
+        current_time = self.get_clock().now().nanoseconds*10^6
         self.force_data.append((current_time, msg))
 
     def listen_torque(self, msg):
-        current_time = self.get_clock().now().nanoseconds
+        current_time = self.get_clock().now().nanoseconds*10^6
         self.torque_data.append((current_time, msg))
 
     def update_graph(self):

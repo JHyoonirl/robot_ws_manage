@@ -21,7 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'sensor_data = manage_hardware.sensor_data:main',
-            'visual_data = manage_hardware.visual_data:main',
+            'visual_data = manage_hardware.sensor_graph:main',
         ],
     },
 )
