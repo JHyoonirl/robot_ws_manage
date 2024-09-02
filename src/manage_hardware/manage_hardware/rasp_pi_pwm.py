@@ -14,12 +14,6 @@ class PwmPublisher(Node):
         # pwm initialize
         self.pwm_neut = int(50)
         self.pwm = self.pwm_neut
-        self.pwm_key_subscriber = self.create_subscription(
-            String,
-            'keyboard_input',
-            self.pwm_order,
-            qos_profile
-        )
 
         self.pwm_publisher = self.create_publisher(
             Float64,

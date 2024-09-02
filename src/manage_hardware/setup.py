@@ -22,6 +22,7 @@ setup(
         'console_scripts': [
             'sensor_data = manage_hardware.sensor_data:main',
             'visual_data = manage_hardware.sensor_graph:main',
+            'rasp_pi_pwm = manage_hardware.rasp_pi_pwm:main',
         ],
     },
 )

@@ -30,6 +30,7 @@ setup(
             'keyboard_publisher = pwm_msg.keyboard_publisher:main',
             'qt_ftsensor = pwm_msg.qt_ftsensor:main',
             'ftsensor_sub = pwm_msg.ftsensor_sub:main',
+            'pwm_server = pwm_msg.pwm_server:main',
         ],
     },
 )

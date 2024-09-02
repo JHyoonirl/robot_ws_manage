@@ -1,0 +1,3 @@
+bool pwm_switch
+---
+bool pwm_result

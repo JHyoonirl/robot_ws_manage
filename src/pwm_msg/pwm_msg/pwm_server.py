@@ -2,12 +2,13 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
 from custominterface.srv import Status
+from std_msgs.msg import String, Float64
 
 
 class PwmServer(Node):
 
     def __init__(self):
-        super().__init__('pwm_status')
+        super().__init__('pwm_server')
         qos_profile = QoSProfile(depth=10)
         self.resolution = 16
         # self.pwm_range = pow(2,16)
@@ -16,10 +17,20 @@ class PwmServer(Node):
         self.pwm = self.pwm_neut
         self.srv = self.create_service(
             Status,
-            'pwm_status',
+            'pwm_server',
             self.pwm_server
         )
         
+        self.pwm_publisher = self.create_publisher(
+            Float64,
+            'pwm_signal',
+            qos_profile)
+        
+        ## INIT ##
+        self.response = False
+
+        self.timer = self.create_timer(0.01, self.publish_pwm)
+
         # self.timer = self.create_timer(0.01, self.publish_pwm)
 
     def pwm_server(self, request, response):
@@ -28,16 +39,20 @@ class PwmServer(Node):
             
         elif request.pwm_switch == False:
             response.pwm_result == False
-        print(response)
+        self.response = response.pwm_result
+        # print(response)
         return response
 
+    def publish_pwm(self):
+        
+        msg = Float64()
+        msg.data = float(self.pwm)
+        
+        if self.response == False:
+            msg.data = float(50)
 
-
-    # def publish_pwm(self):
-    #     msg = Float64()
-    #     msg.data = float(self.pwm)
-    #     self.pwm_publisher.publish(msg)
-    #     self.get_logger().info('Published pwm: {0}'.format(msg.data))
+        self.pwm_publisher.publish(msg)
+        self.get_logger().info('Published pwm: {0}'.format(msg.data))
 
 
 def main(args=None):
