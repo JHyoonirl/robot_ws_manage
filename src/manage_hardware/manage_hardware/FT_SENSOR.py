@@ -33,6 +33,19 @@ class FTSensor:
         except Exception as e:
             print('FT sensor 초기화 실패:', e)
             return False
+        
+    def ft_sensor_bias_set(self):
+        cmd = [0x11, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+        try:
+            for command in cmd:
+                self.send_data_without_read(command)
+                time.sleep(0.2)
+            print('FT sensor bias 성공')
+            return True
+        except Exception as e:
+            print('FT sensor 초기화 실패:', e)
+            return False
+
 
     def data_read_and_process(self):
         while self.running:
@@ -61,7 +74,9 @@ class FTSensor:
         checksum = self.calculate_checksum(data)
         packet = sop + bytes(data) + bytes([checksum]) + eop
         self.ser.write(packet)
-        return self.ser.read(19)  # Adjusted to ensure response is 
+        return self.ser.read(19)  # Adjusted to ensure response is
+    
+    
     def send_data_without_read(self, data):
         sop = bytes([0x55])
         eop = bytes([0xAA])

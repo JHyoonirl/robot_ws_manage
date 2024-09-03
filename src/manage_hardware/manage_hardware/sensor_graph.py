@@ -1,16 +1,18 @@
 import sys
 import rclpy
+import time
 from rclpy.node import Node
 from geometry_msgs.msg import Vector3
-from PyQt5.QtWidgets import QApplication, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QApplication, QVBoxLayout, QWidget, QPushButton
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import matplotlib.pyplot as plt
 from collections import deque
 from threading import Thread
+from custominterface.srv import Status
 
 class VisualSensor(Node):
     def __init__(self, canvas):
-        super().__init__('force_torque_graph')
+        super().__init__('FT_graph')
         self.canvas = canvas
         self.ax = canvas.figure.subplots(2, 1)
         self.subscription_force = self.create_subscription(
@@ -23,6 +25,7 @@ class VisualSensor(Node):
             'torque_data',
             self.listen_torque,
             10)
+        self.cli = self.create_client(Status, 'sensor_server')
         self.force_data = deque(maxlen=100)
         self.torque_data = deque(maxlen=100)
         self.timer = self.create_timer(0.1, self.update_graph)
@@ -42,7 +45,7 @@ class VisualSensor(Node):
             self.ax[0].plot(times, [f[0] for f in forces], label='X', color='red')
             self.ax[0].plot(times, [f[1] for f in forces], label='Y', color='green')
             self.ax[0].plot(times, [f[2] for f in forces], label='Z', color='blue')
-            self.ax[0].legend()
+            self.ax[0].legend(loc=(0.85, 0.85))
             self.ax[0].set_title('Force Data')
             self.ax[0].set_xlabel('Time (ns)')
             self.ax[0].set_ylabel('Force')
@@ -61,6 +64,9 @@ class VisualSensor(Node):
 class App(QWidget):
     def __init__(self):
         super().__init__()
+        self.init_ui()
+
+    def init_ui(self):
         self.layout = QVBoxLayout(self)
         # Creating the FigureCanvas object correctly
         self.canvas = FigureCanvas(plt.Figure())
@@ -81,6 +87,7 @@ class App(QWidget):
 def main(args=None):
     rclpy.init(args=args)
     app = QApplication(sys.argv)
+
     ex = App()
     sys.exit(app.exec_())
 

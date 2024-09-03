@@ -4,13 +4,19 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile
 # from std_msgs.msg import String, Float64
 from geometry_msgs.msg import Vector3
-
+from custominterface.srv import Status
 
 class Sensor(Node):
 
     def __init__(self):
-        super().__init__('FTSensor')
+        super().__init__('FT_data')
         self.sensor = FTSensor(port='/dev/ttyUSB0')
+
+        self.srv = self.create_service(
+            Status,
+            'sensor_server',
+            self.sensor_server
+        )
         self.force_publisher = self.create_publisher(
             Vector3,
             'force_data',
@@ -27,25 +33,29 @@ class Sensor(Node):
         if not self.sensor.ft_sensor_init():
             self.get_logger().error('Failed to initialize sensor')
             raise Exception("Sensor initialization failed")
+        
+    def sensor_server(self, request, response):
+        if request.sensor_bias_set == True:
+            self.bias_set_btn = True
+            result = self.sensor.ft_sensor_bias_set()
+            if result == True:
+                self.get_logger().info('FT sensor bias 성공')
+            elif result == False:
+                self.get_logger().info('FT sensor bias 실패')
+        self.bias_set_btn = False
 
     def publish_sensor(self):
         force = Vector3()
         torque = Vector3()
-        data = self.sensor.data_read_and_process()
-        if self.sensor.new_data_available:
-            # Convert the data to a string or the appropriate ROS 2 message format
-            self.sensor.new_data_available = False
-
-            force.x = float(data[0])
-            force.y = float(data[1])
-            force.z = float(data[2])
-            torque.x = float(data[3])
-            torque.y = float(data[4])
-            torque.z = float(data[5])
-            self.force_publisher.publish(force)
-            self.torque_publisher.publish(torque)
-            self.get_logger().info('force: (x:{0}), (y:{1}), (z:{2})'.format(force.x, force.y, force.z))
-            self.get_logger().info('torque: (x:{0}), (y:{1}), (z:{2})'.format(torque.x, torque.y, torque.z))
+        try:
+            data = self.sensor.data_read_and_process()
+            if data:
+                force.x, force.y, force.z = data[:3]
+                torque.x, torque.y, torque.z = data[3:6]
+                self.force_publisher.publish(force)
+                self.torque_publisher.publish(torque)
+        except Exception as e:
+            self.get_logger().error(f'Error reading sensor data: {e}')
 
 def main(args=None):
     rclpy.init(args=args)

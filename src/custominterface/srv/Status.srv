@@ -1,3 +1,6 @@
 bool pwm_switch
+bool sensor_bias_set
+bool sensor_read_data
 ---
 bool pwm_result
+bool sensor_bias_result

@@ -21,38 +21,25 @@ class PwmServer(Node):
             self.pwm_server
         )
         
-        self.pwm_publisher = self.create_publisher(
+        self.pwm_publisher = self.create_subscription(
             Float64,
             'pwm_signal',
+            self.pwm_subscriber,
             qos_profile)
-        
-        ## INIT ##
-        self.response = False
-
-        self.timer = self.create_timer(0.01, self.publish_pwm)
-
-        # self.timer = self.create_timer(0.01, self.publish_pwm)
 
     def pwm_server(self, request, response):
         if request.pwm_switch == True:
-            response.pwm_result == True
-            
+            response.pwm_result = True
         elif request.pwm_switch == False:
-            response.pwm_result == False
+            response.pwm_result = False
         self.response = response.pwm_result
-        # print(response)
+        print(self.response)
         return response
 
-    def publish_pwm(self):
+    def pwm_subscriber(self, msg):
+        self.get_logger().info('Subscribed pwm: {0}'.format(msg.data))
+        # pass
         
-        msg = Float64()
-        msg.data = float(self.pwm)
-        
-        if self.response == False:
-            msg.data = float(50)
-
-        self.pwm_publisher.publish(msg)
-        self.get_logger().info('Published pwm: {0}'.format(msg.data))
 
 
 def main(args=None):
