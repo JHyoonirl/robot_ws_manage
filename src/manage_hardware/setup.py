@@ -25,7 +25,7 @@ setup(
     description='TODO: Package description',
     license='TODO: License declaration',
     tests_require=['pytest'],
-    entry_points={
+    entry_points={ 
         'console_scripts': [
             'sensor_data = manage_hardware.sensor_data:main',
             'sensor_graph = manage_hardware.sensor_graph:main',
