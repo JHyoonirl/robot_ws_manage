@@ -10,7 +10,12 @@ class Sensor(Node):
 
     def __init__(self):
         super().__init__('FT_data')
-        self.sensor = FTSensor(port='/dev/ttyUSB0')
+
+        self.declare_parameter('usb_port', 'dev/ttyUSB0')
+
+        usb_port = self.get_parameter('usb_port').get_parameter_value().string_value
+
+        self.sensor = FTSensor(port=usb_port)
 
         self.srv = self.create_service(
             Status,

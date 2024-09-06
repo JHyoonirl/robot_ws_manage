@@ -12,15 +12,30 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
    
-    return LaunchDescription([
-        Node(
+    usb_port_sensor = DeclareLaunchArgument(
+            'usb_port_sensor', default_value='/dev/ttyUSB0',
+            description='USB port for FT sensor'
+            )
+    
+    sensor_data = Node(
             package='manage_hardware',
             executable='sensor_data',
             name='sensor_data',
-            output='screen'),
-        Node(
+            output='screen',
+            parameters=[{
+                'usb_port': LaunchConfiguration('usb_port_sensor')
+            }]
+            )
+    
+    sensor_graph = Node(
             package='manage_hardware',
             executable='sensor_graph',
             name='sensor_graph',
-            output='screen'),
+            output='screen')
+
+    return LaunchDescription([
+        usb_port_sensor,
+        sensor_data,
+        sensor_graph
+        
     ])
