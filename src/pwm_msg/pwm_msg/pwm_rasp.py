@@ -21,7 +21,7 @@ class PwmServer(Node):
             self.pwm_server
         )
         
-        self.pwm_publisher = self.create_subscription(
+        self.pwm_subscribed = self.create_subscription(
             Float64,
             'pwm_signal',
             self.pwm_subscriber,

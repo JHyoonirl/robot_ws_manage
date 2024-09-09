@@ -65,7 +65,7 @@ class FTSensor:
 
     def decode_received_data(self, packet):
         force = [int.from_bytes(packet[2+i*2:4+i*2], byteorder='big', signed=True) / 50 for i in range(3)]
-        torque = [int.from_bytes(packet[8+i*2:10+i*2], byteorder='big', signed=True) / 2000 for i in range(3)]
+        torque = [int.from_bytes(packet[8+i*2:10+i*2], byteorder='big', signed=True) / 1000 for i in range(3)]
         return force + torque
 
     def send_data_with_read(self, data):

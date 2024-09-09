@@ -32,6 +32,7 @@ setup(
             'visual_data = manage_hardware.sensor_graph:main',
             'rasp_pi_pwm = manage_hardware.rasp_pi_pwm:main',
             'pwm_ve = manage_hardware.pwm_ve:main',
+            'data_load = manage_hardware.data_load:main',
         ],
     },
 )
