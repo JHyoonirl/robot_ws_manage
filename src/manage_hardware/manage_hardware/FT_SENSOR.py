@@ -48,8 +48,9 @@ class FTSensor:
 
 
     def data_read_and_process(self):
+        
         while self.running:
-            self.data_read = [0x0B, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00]   # Continuous read
+            self.data_read = [0x0A, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00]   # Continuous read
             data = self.send_data_with_read(self.data_read)
             try:
                 if data[0] == 0x55 and data[18] == 0xAA:
@@ -62,6 +63,11 @@ class FTSensor:
             except:
                 pass
                 return False
+            
+    def continuous_data(self):
+        self.data_read = [0x0B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]   # Continuous read
+        result = self.send_data_without_read(self.data_read)
+        return result
 
     def decode_received_data(self, packet):
         force = [int.from_bytes(packet[2+i*2:4+i*2], byteorder='big', signed=True) / 50 for i in range(3)]
