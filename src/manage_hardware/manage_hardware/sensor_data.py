@@ -86,10 +86,14 @@ class SensorApp(QWidget):
             bias_result = self.node.sensor.ft_sensor_bias_set()
 
     def turn_on(self):
-        self.node.data_on = True
+        if self.node.sensor.ft_sensor_continuous_data():
+            self.btn_bias.setDisabled(True)
+            self.node.data_on = True
 
     def turn_off(self):
-        self.node.data_on = False
+        if self.node.sensor.ft_sensor_stop_data():
+            self.btn_bias.setEnabled(True)
+            self.node.data_on = False
 
 def main(args=None):
     rclpy.init(args=args)
