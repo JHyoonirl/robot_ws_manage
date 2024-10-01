@@ -139,7 +139,7 @@ class Form(QWidget):
             # Check if values are the same as the previous saved values
             if (force != self.node.prev_force or 
                 torque != self.node.prev_torque):
-                
+            
                 # Append data to deque
                 self.data.append([current_time, pwm, *force, *torque])
 

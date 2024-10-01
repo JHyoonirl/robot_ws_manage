@@ -33,22 +33,8 @@ class FTSensor:
         except Exception as e:
             print('FT sensor 초기화 실패:', e)
             return False
-        
-    def ft_sensor_bias_set(self):
-        cmd = [0x11, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-        try:
-            for command in cmd:
-                self.send_data_without_read(command)
-                time.sleep(0.2)
-            print('FT sensor bias 성공')
-            return True
-        except Exception as e:
-            print('FT sensor 초기화 실패:', e)
-            return False
-
 
     def data_read_and_process(self):
-        
         while self.running:
             self.data_read = [0x0A, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00]   # Continuous read
             data = self.send_data_with_read(self.data_read)
@@ -64,15 +50,43 @@ class FTSensor:
                 pass
                 return False
             
-    def continuous_data(self):
-        self.data_read = [0x0B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]   # Continuous read
-        result = self.send_data_without_read(self.data_read)
-        return result
+    def ft_sensor_continuous_data(self):
+        cmd = [0x0B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]   # Continuous read
+        try:
+            self.send_data_without_read(cmd)
+            time.sleep(0.2)
+            print('FT sensor start 성공')
+            return True
+        except Exception as e:
+            print('FT sensor start 실패:', e)
+            return False
+        
+    def ft_sensor_stop_data(self):
+        cmd = [0x0C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]   # Continuous read
+        try:
+            self.send_data_without_read(cmd)
+            time.sleep(0.2)
+            print('FT sensor Stop 성공')
+            return True
+        except Exception as e:
+            print('FT sensor Stop 실패:', e)
+            return False
+        
+    def ft_sensor_bias_set(self):
+        cmd = [0x11, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+        try:
+            self.send_data_without_read(cmd)
+            time.sleep(0.2)
+            print('FT sensor bias 성공')
+            return True
+        except Exception as e:
+            print('FT sensor bias 실패:', e)
+            return False
 
     def decode_received_data(self, packet):
-        force = [int.from_bytes(packet[2+i*2:4+i*2], byteorder='big', signed=True) / 50 for i in range(3)]
-        torque = [int.from_bytes(packet[8+i*2:10+i*2], byteorder='big', signed=True) / 1000 for i in range(3)]
-        return force + torque
+        force = [int.from_bytes(packet[i*2:2+i*2], byteorder='big', signed=True) / 50 for i in range(3)]
+        torque = [int.from_bytes(packet[6+i*2:8+i*2], byteorder='big', signed=True) / 1000 for i in range(3)]
+        return force, torque
 
     def send_data_with_read(self, data):
         sop = bytes([0x55])
