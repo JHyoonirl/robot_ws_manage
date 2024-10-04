@@ -90,8 +90,16 @@ class Form(QWidget):
         horizontal_layout.addWidget(self.create_group_box('Torque Z', self.label_torque_z))
         main_layout.addLayout(horizontal_layout)
 
+        
+        
+
         # Buttons
         button_layout = QHBoxLayout()
+
+        self.status_label = QLabel("Login", self)
+
+        self.button_reset = QPushButton('Data Reset', self)
+        self.button_reset.clicked.connect(self.data_reset)
         self.button_load = QPushButton('Data Load', self)
         self.button_load.clicked.connect(self.data_load)
         self.button_stop = QPushButton('Data Stop', self)
@@ -101,6 +109,8 @@ class Form(QWidget):
         self.file_name_input = QLineEdit(self)
         self.file_name_input.setPlaceholderText('Enter file name')
 
+        button_layout.addWidget(self.status_label)
+        button_layout.addWidget(self.button_reset)
         button_layout.addWidget(self.button_load)
         button_layout.addWidget(self.button_stop)
         button_layout.addWidget(self.button_save)
@@ -148,20 +158,37 @@ class Form(QWidget):
                 self.node.prev_force = force
                 self.node.prev_torque = torque
 
+
+    def data_reset(self):
+        # self.saving = True
+        self.data = deque()
+        self.status_label.setText("data_reset")
+    
     def data_load(self):
         self.saving = True
+        self.status_label.setText("data_load")
+        self.button_reset.setEnabled(False)
+        self.button_save.setEnabled(False)
 
     def data_stop(self):
         self.saving = False
+        self.status_label.setText("data_stop")
+        self.button_reset.setEnabled(True)
 
     def data_save(self):
+        self.status_label.setText("data_save_start")
         file_name = self.file_name_input.text()
         if file_name:
             df = pd.DataFrame(self.data, columns=['Time', 'PWM', 'Force_X', 'Force_Y', 'Force_Z', 'Torque_X', 'Torque_Y', 'Torque_Z'])
             df.to_excel(f'{file_name}.xlsx', index=False)
             print(f'Data saved to {file_name}.xlsx')
+            self.status_label.setText("data_save_clear")
         else:
             print("Please enter a file name.")
+            self.status_label.setText("data_save_failed")
+        
+        self.data = deque()
+        self.status_label.setText("data_reset")
 
 def run_node(node):
     rclpy.spin(node)
