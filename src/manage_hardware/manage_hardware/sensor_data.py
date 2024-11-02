@@ -3,20 +3,22 @@ import rclpy
 import sys
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
-# from std_msgs.msg import String, Float64
 
-from rclpy.qos import QoSProfile
+import time
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QSpinBox, QLabel
 from threading import Thread
-
+from std_msgs.msg import Bool
 from geometry_msgs.msg import Vector3
 from custominterface.srv import Status
+
 
 class Sensor(Node):
     def __init__(self):
         super().__init__('FT_data')
         self.declare_parameter('usb_port', '/dev/ttyUSB0')
         usb_port = self.get_parameter('usb_port').get_parameter_value().string_value
+        self.qos_profile = QoSProfile(depth=10)
+
 
         self.sensor = FTSensor(port=usb_port)
         self.serial_port = self.sensor.ser
@@ -25,11 +27,16 @@ class Sensor(Node):
         # 데이터 퍼블리싱을 위한 퍼블리셔 설정
         self.force_publisher = self.create_publisher(Vector3, 'force_data', 10)
         self.torque_publisher = self.create_publisher(Vector3, 'torque_data', 10)
+
+        self.sensor_sub = self.create_subscription(Bool, 'sensor_test', self.sensor_test_fcn, self.qos_profile)
+        
         self.data_on = False
+        self.test_bias = False
+        
 
         if self.init_status:
             # 0.005초 간격으로 publish_sensor 호출
-            self.timer = self.create_timer(0.0001, self.publish_sensor)
+            self.timer = self.create_timer(0.005, self.publish_sensor)
         
     def init_sensor(self):
         if not self.sensor.ft_sensor_init():
@@ -37,7 +44,7 @@ class Sensor(Node):
             return False
         else:
             return True
-
+        
     def publish_sensor(self):
         if not self.data_on:
             return  # 데이터 전송이 활성화되지 않았다면 종료
@@ -57,6 +64,17 @@ class Sensor(Node):
         except Exception as e:
             pass
             # self.get_logger().error(f'Error reading sensor data: {e}')
+
+    def sensor_test_fcn(self, msg):
+        self.sensor_test_msg = msg.data # msg type: bool
+        if self.sensor_test_msg == False:
+            self.data_on = False
+            self.sensor.ft_sensor_stop_data()
+            time.sleep(0.5)
+            self.sensor.ft_sensor_bias_set()
+        elif self.sensor_test_msg == True:
+            self.data_on = True
+            self.sensor.ft_sensor_continuous_data()
 
 class SensorApp(QWidget):
     def __init__(self, node):
@@ -82,7 +100,7 @@ class SensorApp(QWidget):
         self.show()
 
     def set_bias(self):
-        if self.node.init_status:
+        if self.node.init_status or self.node.test_bias == True:
             bias_result = self.node.sensor.ft_sensor_bias_set()
 
     def turn_on(self):

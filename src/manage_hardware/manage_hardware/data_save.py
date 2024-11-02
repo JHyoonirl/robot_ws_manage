@@ -5,10 +5,12 @@ from rclpy.node import Node
 from std_msgs.msg import Float64
 from rclpy.qos import QoSProfile
 from geometry_msgs.msg import Vector3
+from std_msgs.msg import Bool
 from PyQt5.QtWidgets import QApplication, QVBoxLayout, QWidget, QLabel, QLineEdit, QGroupBox, QPushButton, QHBoxLayout
 from PyQt5.QtCore import QTimer, QDateTime
 from threading import Thread, Lock
 from collections import deque
+import time
 
 class DataSaver(Node):
     def __init__(self):
@@ -39,6 +41,22 @@ class DataSaver(Node):
             'torque_data',
             self.torque_subscriber,
             self.qos_profile)
+        
+
+        '''
+        To pwm node
+        '''
+        self.pwm_test_float = 110.0
+        self.pwm_publisher = self.create_publisher(Float64, 'pwm_test', self.qos_profile)
+        
+        '''
+        To sensor node
+        '''
+        self.sensor_msg = False
+        self.sensor_pub = self.create_publisher(Bool, 'sensor_test', self.qos_profile)
+        
+        self.timer_pwm = self.create_timer(0.01, self.pwm_test_fcn)
+        self.timer_sensor = self.create_timer(0.01, self.sensor_test_fcn)
 
         # Lock for thread safety when accessing node data
         self.data_lock = Lock()
@@ -54,6 +72,16 @@ class DataSaver(Node):
     def torque_subscriber(self, msg):
         with self.data_lock:
             self.torque_x, self.torque_y, self.torque_z = msg.x, msg.y, msg.z
+
+    def pwm_test_fcn(self):
+        msg = Float64()
+        if self.pwm_test_float <= 100 and self.pwm_test_float >= 0:
+            msg.data = self.pwm_test_float
+            self.pwm_publisher.publish(msg)
+
+    def sensor_test_fcn(self):
+        msg = Bool()
+        msg.data = self.sensor_msg
 
 class Form(QWidget):
     def __init__(self, node):
@@ -90,14 +118,13 @@ class Form(QWidget):
         horizontal_layout.addWidget(self.create_group_box('Torque Z', self.label_torque_z))
         main_layout.addLayout(horizontal_layout)
 
-        
-        
-
         # Buttons
         button_layout = QHBoxLayout()
 
         self.status_label = QLabel("Login", self)
-
+        
+        self.button_test_auto = QPushButton('test_auto', self)
+        self.button_test_auto.clicked.connect(self.test_auto)
         self.button_reset = QPushButton('Data Reset', self)
         self.button_reset.clicked.connect(self.data_reset)
         self.button_load = QPushButton('Data Load', self)
@@ -108,13 +135,17 @@ class Form(QWidget):
         self.button_save.clicked.connect(self.data_save)
         self.file_name_input = QLineEdit(self)
         self.file_name_input.setPlaceholderText('Enter file name')
+        self.file_name_test = QLineEdit(self)
+        self.file_name_test.setPlaceholderText('Enter test iteration')
 
         button_layout.addWidget(self.status_label)
+        button_layout.addWidget(self.button_test_auto)
         button_layout.addWidget(self.button_reset)
         button_layout.addWidget(self.button_load)
         button_layout.addWidget(self.button_stop)
         button_layout.addWidget(self.button_save)
         button_layout.addWidget(self.file_name_input)
+        button_layout.addWidget(self.file_name_test)
         main_layout.addLayout(button_layout)
 
         self.setLayout(main_layout)
@@ -158,6 +189,51 @@ class Form(QWidget):
                 self.node.prev_force = force
                 self.node.prev_torque = torque
 
+    def test_auto(self):
+        '''
+        1) sensor stop
+        2) sensor bias
+        3) sensor start
+        4) data reset
+        5) data load
+        6) pwm on(set)
+        7) data stop
+        8) pwm off(set to neutral)
+        9) data save
+        '''
+        for pwm in list(range(0, 101, 5)):
+            # 1,2)
+            self.node.sensor_msg = False
+            time.sleep(1)
+            # 3)
+            self.node.sensor_msg = True
+            time.sleep(1)
+            # 4)
+            self.data = deque()
+            time.sleep(1)
+            # 5)
+            self.data_load()
+            time.sleep(0.5)
+            # 6)
+            self.node.pwm_test_float = pwm
+            # 7)
+            self.data_stop()
+            # 8)
+            self.node.pwm_test_float = 50.0
+            # 9)
+            self.test = self.file_name_test.text()
+            self.file_name_pwm = pwm
+            if self.file_name :
+                df = pd.DataFrame(self.data, columns=['Time', 'PWM', 'Force_X', 'Force_Y', 'Force_Z', 'Torque_X', 'Torque_Y', 'Torque_Z'])
+                df.to_excel(f'{self.test}_{self.file_name_pwm}.xlsx', index=False)
+                print(f'Data saved to {self.test}_{self.file_name_pwm}.xlsx')
+                self.status_label.setText("data_save_clear")
+            else:
+                print("Please enter a file name.")
+                self.status_label.setText("data_save_failed")
+            time.sleep(15)
+
+
 
     def data_reset(self):
         # self.saving = True
@@ -177,11 +253,11 @@ class Form(QWidget):
 
     def data_save(self):
         self.status_label.setText("data_save_start")
-        file_name = self.file_name_input.text()
-        if file_name:
+        self.file_name = self.file_name_input.text()
+        if self.file_name :
             df = pd.DataFrame(self.data, columns=['Time', 'PWM', 'Force_X', 'Force_Y', 'Force_Z', 'Torque_X', 'Torque_Y', 'Torque_Z'])
-            df.to_excel(f'{file_name}.xlsx', index=False)
-            print(f'Data saved to {file_name}.xlsx')
+            df.to_excel(f'{self.file_name }.xlsx', index=False)
+            print(f'Data saved to {self.file_name }.xlsx')
             self.status_label.setText("data_save_clear")
         else:
             print("Please enter a file name.")
