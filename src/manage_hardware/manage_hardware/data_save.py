@@ -17,17 +17,26 @@ class DataSaver(Node):
         super().__init__('pwm_botton')
         self.qos_profile = QoSProfile(depth=10)
         self.pwm = 0.0
+        self.pwm_time = 0.0
+
         self.force_x = self.force_y = self.force_z = 0.0
         self.torque_x = self.torque_y = self.torque_z = 0.0
         
         # self.prev_pwm = None
         self.prev_force = (None, None, None)
         self.prev_torque = (None, None, None)
+        self.sensor_time = 0
 
         self.pwm_sub = self.create_subscription(
             Float64,
             'pwm_signal',
             self.pwm_subscriber,
+            self.qos_profile)
+        
+        self.pwm_time_sub = self.create_subscription(
+            Float64,
+            'pwm_time',
+            self.pwm_time_subsciber,
             self.qos_profile)
         
         self.force_sub = self.create_subscription(
@@ -42,24 +51,15 @@ class DataSaver(Node):
             self.torque_subscriber,
             self.qos_profile)
         
-
-        '''
-        To pwm node
-        '''
-        self.pwm_test_float = 110.0
-        self.pwm_publisher = self.create_publisher(Float64, 'pwm_test', self.qos_profile)
-        
-        '''
-        To sensor node
-        '''
-        self.sensor_msg = False
-        self.sensor_pub = self.create_publisher(Bool, 'sensor_test', self.qos_profile)
-        
-        self.timer_pwm = self.create_timer(0.01, self.pwm_test_fcn)
-        self.timer_sensor = self.create_timer(0.01, self.sensor_test_fcn)
+        self.sensor_time_sub = self.create_subscription(
+            Float64,
+            'sensor_time',
+            self.sensor_time_subsciber,
+            self.qos_profile)
 
         # Lock for thread safety when accessing node data
         self.data_lock = Lock()
+        self.timer = self.create_timer(0.001, self.time_delay_check)
 
     def pwm_subscriber(self, msg):
         with self.data_lock:
@@ -73,15 +73,18 @@ class DataSaver(Node):
         with self.data_lock:
             self.torque_x, self.torque_y, self.torque_z = msg.x, msg.y, msg.z
 
-    def pwm_test_fcn(self):
-        msg = Float64()
-        if self.pwm_test_float <= 100 and self.pwm_test_float >= 0:
-            msg.data = self.pwm_test_float
-            self.pwm_publisher.publish(msg)
+    def sensor_time_subsciber(self, msg):
+        with self.data_lock:
+            self.sensor_time = msg.data
 
-    def sensor_test_fcn(self):
-        msg = Bool()
-        msg.data = self.sensor_msg
+    def pwm_time_subsciber(self, msg):
+        with self.data_lock:
+            self.pwm_time = msg.data
+
+    def time_delay_check(self):
+        time_delay = self.sensor_time - self.pwm_time
+        # self.get_logger().info(f'{time_delay:.6f}')
+        # pass
 
 class Form(QWidget):
     def __init__(self, node):
@@ -123,8 +126,8 @@ class Form(QWidget):
 
         self.status_label = QLabel("Login", self)
         
-        self.button_test_auto = QPushButton('test_auto', self)
-        self.button_test_auto.clicked.connect(self.test_auto)
+        # self.button_test_auto = QPushButton('test_auto', self)
+        # self.button_test_auto.clicked.connect(self.test_auto)
         self.button_reset = QPushButton('Data Reset', self)
         self.button_reset.clicked.connect(self.data_reset)
         self.button_load = QPushButton('Data Load', self)
@@ -135,23 +138,26 @@ class Form(QWidget):
         self.button_save.clicked.connect(self.data_save)
         self.file_name_input = QLineEdit(self)
         self.file_name_input.setPlaceholderText('Enter file name')
-        self.file_name_test = QLineEdit(self)
-        self.file_name_test.setPlaceholderText('Enter test iteration')
+        # self.file_name_test = QLineEdit(self)
+        # self.file_name_test.setPlaceholderText('Enter test iteration')
 
         button_layout.addWidget(self.status_label)
-        button_layout.addWidget(self.button_test_auto)
+        # button_layout.addWidget(self.button_test_auto)
         button_layout.addWidget(self.button_reset)
         button_layout.addWidget(self.button_load)
         button_layout.addWidget(self.button_stop)
         button_layout.addWidget(self.button_save)
         button_layout.addWidget(self.file_name_input)
-        button_layout.addWidget(self.file_name_test)
+        # button_layout.addWidget(self.file_name_test)
         main_layout.addLayout(button_layout)
 
         self.setLayout(main_layout)
         self.setWindowTitle('Data Save')
         self.resize(800, 200)
+        
         self.show()
+        QApplication.processEvents()
+        self.move(0, 0)
 
     def create_group_box(self, title, label):
         group_box = QGroupBox(title)
@@ -161,18 +167,22 @@ class Form(QWidget):
         return group_box
 
     def update_data(self):
-        with self.node.data_lock:
-            self.label_pwm.setText(f'{self.node.pwm:.2f}')
-            self.label_force_x.setText(f'{self.node.force_x:.2f}')
-            self.label_force_y.setText(f'{self.node.force_y:.2f}')
-            self.label_force_z.setText(f'{self.node.force_z:.2f}')
-            self.label_torque_x.setText(f'{self.node.torque_x:.2f}')
-            self.label_torque_y.setText(f'{self.node.torque_y:.2f}')
-            self.label_torque_z.setText(f'{self.node.torque_z:.2f}')
+        # with self.node.data_lock:
+        self.label_pwm.setText(f'{self.node.pwm:.2f}')
+        self.label_force_x.setText(f'{self.node.force_x:.2f}')
+        self.label_force_y.setText(f'{self.node.force_y:.2f}')
+        self.label_force_z.setText(f'{self.node.force_z:.2f}')
+        self.label_torque_x.setText(f'{self.node.torque_x:.2f}')
+        self.label_torque_y.setText(f'{self.node.torque_y:.2f}')
+        self.label_torque_z.setText(f'{self.node.torque_z:.2f}')
+        time_difference = abs(self.node.sensor_time - self.node.pwm_time)
 
+    # Define a maximum acceptable time difference (e.g., 0.1 seconds)
+        MAX_TIME_DIFF = 0.01
         # Save data if the saving flag is set and values have changed
-        if self.saving:
+        if self.saving and time_difference < MAX_TIME_DIFF:
             current_time = QDateTime.currentDateTime().toString("hh:mm:ss.zzz")  # Time with ms precision
+            print(self.node.sensor_time - self.node.pwm_time)
             pwm = self.node.pwm
             force = (self.node.force_x, self.node.force_y, self.node.force_z)
             torque = (self.node.torque_x, self.node.torque_y, self.node.torque_z)
@@ -180,14 +190,15 @@ class Form(QWidget):
             # Check if values are the same as the previous saved values
             if (force != self.node.prev_force or 
                 torque != self.node.prev_torque):
-            
-                # Append data to deque
-                self.data.append([current_time, pwm, *force, *torque])
+                pass
+        
+            # Append data to deque
+            self.data.append([current_time, pwm, *force, *torque])
 
-                # Update previous values
-                # self.node.prev_pwm = pwm
-                self.node.prev_force = force
-                self.node.prev_torque = torque
+            # Update previous values
+            # self.node.prev_pwm = pwm
+            self.node.prev_force = force
+            self.node.prev_torque = torque
 
     def test_auto(self):
         '''
@@ -203,27 +214,46 @@ class Form(QWidget):
         '''
         for pwm in list(range(0, 101, 5)):
             # 1,2)
-            self.node.sensor_msg = False
+            self.node.sensor_msg = 1.0
             time.sleep(1)
+            # self.get_logger().info('1')
+            print(1)
             # 3)
-            self.node.sensor_msg = True
+            self.node.sensor_msg = 2.0
             time.sleep(1)
+            
+            self.node.sensor_msg = 3.0
+            time.sleep(1)
+            # self.get_logger().info('3')
+            print(3)
             # 4)
             self.data = deque()
             time.sleep(1)
+            # self.get_logger().info('4')
+            print(4)
             # 5)
             self.data_load()
             time.sleep(0.5)
+            # self.get_logger().info('5')
+            print(5)
             # 6)
             self.node.pwm_test_float = pwm
+            time.sleep(5)
+            # self.get_logger().info('6')
+            print(6)
             # 7)
             self.data_stop()
+            time.sleep(1)
+            # self.get_logger().info('7')
+            print(7)
             # 8)
             self.node.pwm_test_float = 50.0
+            # self.get_logger().info('8')
+            print(8)
             # 9)
             self.test = self.file_name_test.text()
             self.file_name_pwm = pwm
-            if self.file_name :
+            if self.file_name_pwm :
                 df = pd.DataFrame(self.data, columns=['Time', 'PWM', 'Force_X', 'Force_Y', 'Force_Z', 'Torque_X', 'Torque_Y', 'Torque_Z'])
                 df.to_excel(f'{self.test}_{self.file_name_pwm}.xlsx', index=False)
                 print(f'Data saved to {self.test}_{self.file_name_pwm}.xlsx')
@@ -232,8 +262,8 @@ class Form(QWidget):
                 print("Please enter a file name.")
                 self.status_label.setText("data_save_failed")
             time.sleep(15)
-
-
+            # self.get_logger().info('9')
+            print(9)
 
     def data_reset(self):
         # self.saving = True
@@ -250,6 +280,7 @@ class Form(QWidget):
         self.saving = False
         self.status_label.setText("data_stop")
         self.button_reset.setEnabled(True)
+        self.button_save.setEnabled(True)
 
     def data_save(self):
         self.status_label.setText("data_save_start")

@@ -6,6 +6,7 @@ from custominterface.srv import Status
 from rclpy.qos import QoSProfile
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QSpinBox, QLabel
 from threading import Thread
+from datetime import datetime
 
 class PwmClient(Node):
     def __init__(self):
@@ -18,6 +19,9 @@ class PwmClient(Node):
         self.pwm_publisher = self.create_publisher(Float64, 'pwm_signal', qos_profile)
         self.pwm = 50.0  # 초기 PWM 값 설정
         self.pwm_response = False  # 서비스 응답 상태 초기화
+
+        self.pwm_time = self.create_publisher(Float64, 'pwm_time', qos_profile)
+
         self.timer = self.create_timer(0.01, self.publish_pwm)
 
     def send_request(self, pwm_switch):
@@ -35,12 +39,15 @@ class PwmClient(Node):
 
     def publish_pwm(self):
         msg = Float64()
+        time_ = Float64()
         if self.pwm_response:
             msg.data = self.pwm
         else:
             msg.data = 50.0  # PWM 값을 기본값으로 재설정
+        time_.data = float(datetime.now().timestamp())
+        self.pwm_time.publish(time_)
         self.pwm_publisher.publish(msg)
-        self.get_logger().info('Published pwm: {0}'.format(msg.data))
+        # self.get_logger().info('Published pwm: {0}'.format(msg.data))
 
 class PwmApp(QWidget):
     def __init__(self, node):
@@ -68,7 +75,10 @@ class PwmApp(QWidget):
         
         self.setLayout(layout)
         self.setWindowTitle('PWM Controller')
+        
         self.show()
+        QApplication.processEvents()
+        self.move(500, 500)
 
     def pwm_value_changed(self, value):
         self.node.pwm = float(value)

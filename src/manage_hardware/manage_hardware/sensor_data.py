@@ -7,9 +7,10 @@ from rclpy.qos import QoSProfile
 import time
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QSpinBox, QLabel
 from threading import Thread
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool, Float64
 from geometry_msgs.msg import Vector3
 from custominterface.srv import Status
+from datetime import datetime
 
 
 class Sensor(Node):
@@ -27,16 +28,19 @@ class Sensor(Node):
         # 데이터 퍼블리싱을 위한 퍼블리셔 설정
         self.force_publisher = self.create_publisher(Vector3, 'force_data', 10)
         self.torque_publisher = self.create_publisher(Vector3, 'torque_data', 10)
+        self.sensor_time = self.create_publisher(Float64, 'sensor_time', 10)
 
-        self.sensor_sub = self.create_subscription(Bool, 'sensor_test', self.sensor_test_fcn, self.qos_profile)
-        
+        # self.sensor_sub = self.create_subscription(Float64, 'sensor_test', self.sensor_test_fcn, self.qos_profile)
+        self.test_switch = False
+        self.sensor_test_msg = 3
+
         self.data_on = False
-        self.test_bias = False
+        # self.test_bias = False
         
 
         if self.init_status:
             # 0.005초 간격으로 publish_sensor 호출
-            self.timer = self.create_timer(0.005, self.publish_sensor)
+            self.timer = self.create_timer(0.0001, self.publish_sensor)
         
     def init_sensor(self):
         if not self.sensor.ft_sensor_init():
@@ -51,6 +55,7 @@ class Sensor(Node):
         
         force = Vector3()
         torque = Vector3()
+        time_ = Float64()
         try:
             data = self.serial_port.read(1)  # 1바이트 읽기
             if data and data[0] == 0x0B:  # 특정 데이터 값 확인
@@ -61,20 +66,44 @@ class Sensor(Node):
                 # self.get_logger().info(f'data: {force, torque}')
                 self.force_publisher.publish(force)  # 데이터 퍼블리시
                 self.torque_publisher.publish(torque)
+
+                time_.data = float(datetime.now().timestamp())
+                self.sensor_time.publish(time_)
         except Exception as e:
             pass
             # self.get_logger().error(f'Error reading sensor data: {e}')
 
     def sensor_test_fcn(self, msg):
-        self.sensor_test_msg = msg.data # msg type: bool
-        if self.sensor_test_msg == False:
+        if self.sensor_test_msg != msg.data:
+            self.test_switch = True
+            self.sensor_test_msg = msg.data
+
+        # self.sensor_test_msg = msg.data
+        
+        if self.sensor_test_msg == 1 and self.test_switch:
             self.data_on = False
-            self.sensor.ft_sensor_stop_data()
+            try:
+                self.sensor.ft_sensor_stop_data()
+                self.get_logger().info('sensor stop')
+            except:
+                self.get_logger().info('sensor stop fail')
             time.sleep(0.5)
-            self.sensor.ft_sensor_bias_set()
-        elif self.sensor_test_msg == True:
+            # self.sensor.ft_sensor_bias_set()
+            try:
+                self.sensor.ft_sensor_bias_set()
+                self.get_logger().info('sensor bias set')
+            except:
+                self.get_logger().info('sensor bias set fail')
+            self.test_switch = False
+        elif self.sensor_test_msg == 2 and self.test_switch:
             self.data_on = True
-            self.sensor.ft_sensor_continuous_data()
+            try:
+                self.sensor.ft_sensor_continuous_data()
+                self.get_logger().info('sensor data start')
+            except:
+                self.get_logger().info('sensor data startfail')
+            self.test_switch = False
+            # self.sensor.ft_sensor_continuous_data()
 
 class SensorApp(QWidget):
     def __init__(self, node):
@@ -97,7 +126,10 @@ class SensorApp(QWidget):
 
         self.setLayout(layout)
         self.setWindowTitle('Sensor UI')
+        
         self.show()
+        QApplication.processEvents()
+        self.move(1000, 500)
 
     def set_bias(self):
         if self.node.init_status or self.node.test_bias == True:
