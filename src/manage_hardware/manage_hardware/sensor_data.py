@@ -39,6 +39,7 @@ class Sensor(Node):
         
 
         if self.init_status:
+            self.get_logger().info('sensor booting success')
             # 0.005초 간격으로 publish_sensor 호출
             self.timer = self.create_timer(0.0001, self.publish_sensor)
         
@@ -57,18 +58,20 @@ class Sensor(Node):
         torque = Vector3()
         time_ = Float64()
         try:
-            data = self.serial_port.read(1)  # 1바이트 읽기
-            if data and data[0] == 0x0B:  # 특정 데이터 값 확인
-                data_received = self.serial_port.read(13)  # 추가 데이터 읽기
-                decoded_force, decoded_torque = self.sensor.decode_received_data(data_received)
-                force.x, force.y, force.z = decoded_force
-                torque.x, torque.y, torque.z = decoded_torque
-                # self.get_logger().info(f'data: {force, torque}')
-                self.force_publisher.publish(force)  # 데이터 퍼블리시
-                self.torque_publisher.publish(torque)
+            if self.serial_port.in_waiting >= 14:
+                data = self.serial_port.read(1)  # 1바이트 읽기
+                # self.get_logger().info(data)
+                if data and data[0] == 0x0B:  # 특정 데이터 값 확인
+                    data_received = self.serial_port.read(13)  # 추가 데이터 읽기
+                    decoded_force, decoded_torque = self.sensor.decode_received_data(data_received)
+                    force.x, force.y, force.z = decoded_force
+                    torque.x, torque.y, torque.z = decoded_torque
+                    # self.get_logger().info(f'data: {force, torque}')
+                    self.force_publisher.publish(force)  # 데이터 퍼블리시
+                    self.torque_publisher.publish(torque)
 
-                time_.data = float(datetime.now().timestamp())
-                self.sensor_time.publish(time_)
+                    time_.data = float(datetime.now().timestamp())
+                    self.sensor_time.publish(time_)
         except Exception as e:
             pass
             # self.get_logger().error(f'Error reading sensor data: {e}')
