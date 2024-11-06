@@ -22,7 +22,7 @@ class PwmClient(Node):
 
         self.pwm_time = self.create_publisher(Float64, 'pwm_time', qos_profile)
 
-        self.timer = self.create_timer(0.01, self.publish_pwm)
+        self.timer = self.create_timer(0.005, self.publish_pwm)
 
     def send_request(self, pwm_switch):
         req = Status.Request()

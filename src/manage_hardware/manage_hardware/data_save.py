@@ -3,21 +3,24 @@ import rclpy
 import pandas as pd
 from rclpy.node import Node
 from std_msgs.msg import Float64
-from rclpy.qos import QoSProfile
-from geometry_msgs.msg import Vector3
+from rclpy.qos import QoSProfile, QoSHistoryPolicy, QoSReliabilityPolicy
+from geometry_msgs.msg import Vector3Stamped
 from std_msgs.msg import Bool
 from PyQt5.QtWidgets import QApplication, QVBoxLayout, QWidget, QLabel, QLineEdit, QGroupBox, QPushButton, QHBoxLayout
 from PyQt5.QtCore import QTimer, QDateTime
 from threading import Thread, Lock
 from collections import deque
+import datetime
 import time
 
 class DataSaver(Node):
     def __init__(self):
         super().__init__('pwm_botton')
+        # self.qos_profile = QoSProfile(history = QoSHistoryPolicy.KEEP_LAST, depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
         self.qos_profile = QoSProfile(depth=10)
+        self.qos_profile_ = QoSProfile(depth=100)
         self.pwm = 0.0
-        self.pwm_time = 0.0
+        self.pwm_timestamp = 0.0
 
         self.force_x = self.force_y = self.force_z = 0.0
         self.torque_x = self.torque_y = self.torque_z = 0.0
@@ -26,6 +29,21 @@ class DataSaver(Node):
         self.prev_force = (None, None, None)
         self.prev_torque = (None, None, None)
         self.sensor_time = 0
+        self.force_packet = 0
+        self.torque_packet = 0
+        self.force_timestamp = 0.0
+        self.torque_timestamp = 0.0
+        self.saving_status = False
+        self.last_pwm_save_time = time.time()
+        self.last_force_save_time = time.time()
+        self.last_torque_save_time = time.time()
+
+        self.data_sheet_pwm = deque()
+        self.data_sheet_force = deque()
+        self.data_sheet_torque = deque()
+
+        self.force_ = ()
+        self.torque_ = ()
 
         self.pwm_sub = self.create_subscription(
             Float64,
@@ -40,16 +58,16 @@ class DataSaver(Node):
             self.qos_profile)
         
         self.force_sub = self.create_subscription(
-            Vector3,
+            Vector3Stamped,
             'force_data',
             self.force_subscriber,
-            self.qos_profile)
+            self.qos_profile_)
         
         self.torque_sub = self.create_subscription(
-            Vector3,
+            Vector3Stamped,
             'torque_data',
             self.torque_subscriber,
-            self.qos_profile)
+            self.qos_profile_)
         
         self.sensor_time_sub = self.create_subscription(
             Float64,
@@ -59,32 +77,68 @@ class DataSaver(Node):
 
         # Lock for thread safety when accessing node data
         self.data_lock = Lock()
-        self.timer = self.create_timer(0.001, self.time_delay_check)
+        self.timer = self.create_timer(0.005, self.data_saver)
 
     def pwm_subscriber(self, msg):
-        with self.data_lock:
-            self.pwm = msg.data
+        # with self.data_lock:
+        self.pwm = msg.data
+        self.pwm_timestamp = time.time()
+        if self.saving_status:
+            
+            dt_object = datetime.datetime.fromtimestamp(self.pwm_timestamp)
+
+            formatted_time = dt_object.strftime('%H:%M:%S.%f')[:-3]  # .%f는 마이크로세컨드까지 포함하므로, 마지막 3자리를 잘라 밀리세컨드로 사용
+
+            data_entry = [formatted_time, self.pwm]
+            self.data_sheet_pwm.append(data_entry)
+            self.last_pwm_save_time = time.time()
 
     def force_subscriber(self, msg):
-        with self.data_lock:
-            self.force_x, self.force_y, self.force_z = msg.x, msg.y, msg.z
+        # with self.data_lock:
+        self.force_x, self.force_y, self.force_z = msg.vector.x, msg.vector.y, msg.vector.z
+        self.force_timestamp = time.time()
+        if self.saving_status:
+            timestamp = msg.header.stamp
+            dt_object = datetime.datetime.fromtimestamp(timestamp.sec + timestamp.nanosec / 1e9)
+
+            formatted_time = dt_object.strftime('%H:%M:%S.%f')[:-3]  # 
+            
+            data_entry = [formatted_time, self.force_x, self.force_y, self.force_z]
+            self.data_sheet_force.append(data_entry)
+            self.last_force_save_time = time.time()
+                
 
     def torque_subscriber(self, msg):
-        with self.data_lock:
-            self.torque_x, self.torque_y, self.torque_z = msg.x, msg.y, msg.z
+        # with self.data_lock:
+        self.torque_x, self.torque_y, self.torque_z = msg.vector.x, msg.vector.y, msg.vector.z
+        self.torque_timestamp = time.time()
+        if self.saving_status:
+            # if self.torque_timestamp - self.last_torque_save_time >= 0.005:
+            timestamp = msg.header.stamp
+            dt_object = datetime.datetime.fromtimestamp(timestamp.sec + timestamp.nanosec / 1e9)
+
+            # 원하는 형식으로 시간을 문자열로 변환
+            formatted_time = dt_object.strftime('%H:%M:%S.%f')[:-3]  # 
+            
+            # 시간, 분, 초, 밀리세컨드를 포함하는 문자열 형식으로 반환합니다.
+            # formatted_time = now.strftime("%H:%M:%S.%f")[:-3]  # .%f는 마이크로세컨드까지 포함하므로, 마지막 3자리를 잘라 밀리세컨드로 사용
+
+            data_entry = [formatted_time, self.torque_x, self.torque_y, self.torque_z]
+            self.data_sheet_torque.append(data_entry)
+            self.last_force_save_time = time.time()
 
     def sensor_time_subsciber(self, msg):
-        with self.data_lock:
-            self.sensor_time = msg.data
+        # with self.data_lock:
+        self.sensor_time = msg.data
 
     def pwm_time_subsciber(self, msg):
-        with self.data_lock:
-            self.pwm_time = msg.data
+        # with self.data_lock:
+        self.pwm_time = msg.data
 
-    def time_delay_check(self):
-        time_delay = self.sensor_time - self.pwm_time
-        # self.get_logger().info(f'{time_delay:.6f}')
-        # pass
+    def data_saver(self):
+        # time_delay = self.sensor_time - self.pwm_time
+        if self.saving_status:
+            current_time = time.time()
 
 class Form(QWidget):
     def __init__(self, node):
@@ -96,7 +150,7 @@ class Form(QWidget):
         # QTimer to periodically update the data
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_data)
-        self.timer.start(1)  # Update every 10ms
+        self.timer.start()  # Update every 10ms
 
         # Main layout setup
         main_layout = QVBoxLayout()
@@ -175,109 +229,20 @@ class Form(QWidget):
         self.label_torque_x.setText(f'{self.node.torque_x:.2f}')
         self.label_torque_y.setText(f'{self.node.torque_y:.2f}')
         self.label_torque_z.setText(f'{self.node.torque_z:.2f}')
-        time_difference = abs(self.node.sensor_time - self.node.pwm_time)
-
-    # Define a maximum acceptable time difference (e.g., 0.1 seconds)
-        MAX_TIME_DIFF = 0.01
-        # Save data if the saving flag is set and values have changed
-        if self.saving and time_difference < MAX_TIME_DIFF:
-            current_time = QDateTime.currentDateTime().toString("hh:mm:ss.zzz")  # Time with ms precision
-            print(self.node.sensor_time - self.node.pwm_time)
-            pwm = self.node.pwm
-            force = (self.node.force_x, self.node.force_y, self.node.force_z)
-            torque = (self.node.torque_x, self.node.torque_y, self.node.torque_z)
-
-            # Check if values are the same as the previous saved values
-            if (force != self.node.prev_force or 
-                torque != self.node.prev_torque):
-                pass
-        
-            # Append data to deque
-            self.data.append([current_time, pwm, *force, *torque])
-
-            # Update previous values
-            # self.node.prev_pwm = pwm
-            self.node.prev_force = force
-            self.node.prev_torque = torque
-
-    def test_auto(self):
-        '''
-        1) sensor stop
-        2) sensor bias
-        3) sensor start
-        4) data reset
-        5) data load
-        6) pwm on(set)
-        7) data stop
-        8) pwm off(set to neutral)
-        9) data save
-        '''
-        for pwm in list(range(0, 101, 5)):
-            # 1,2)
-            self.node.sensor_msg = 1.0
-            time.sleep(1)
-            # self.get_logger().info('1')
-            print(1)
-            # 3)
-            self.node.sensor_msg = 2.0
-            time.sleep(1)
-            
-            self.node.sensor_msg = 3.0
-            time.sleep(1)
-            # self.get_logger().info('3')
-            print(3)
-            # 4)
-            self.data = deque()
-            time.sleep(1)
-            # self.get_logger().info('4')
-            print(4)
-            # 5)
-            self.data_load()
-            time.sleep(0.5)
-            # self.get_logger().info('5')
-            print(5)
-            # 6)
-            self.node.pwm_test_float = pwm
-            time.sleep(5)
-            # self.get_logger().info('6')
-            print(6)
-            # 7)
-            self.data_stop()
-            time.sleep(1)
-            # self.get_logger().info('7')
-            print(7)
-            # 8)
-            self.node.pwm_test_float = 50.0
-            # self.get_logger().info('8')
-            print(8)
-            # 9)
-            self.test = self.file_name_test.text()
-            self.file_name_pwm = pwm
-            if self.file_name_pwm :
-                df = pd.DataFrame(self.data, columns=['Time', 'PWM', 'Force_X', 'Force_Y', 'Force_Z', 'Torque_X', 'Torque_Y', 'Torque_Z'])
-                df.to_excel(f'{self.test}_{self.file_name_pwm}.xlsx', index=False)
-                print(f'Data saved to {self.test}_{self.file_name_pwm}.xlsx')
-                self.status_label.setText("data_save_clear")
-            else:
-                print("Please enter a file name.")
-                self.status_label.setText("data_save_failed")
-            time.sleep(15)
-            # self.get_logger().info('9')
-            print(9)
 
     def data_reset(self):
         # self.saving = True
-        self.data = deque()
+        self.node.data_sheet = deque()
         self.status_label.setText("data_reset")
     
     def data_load(self):
-        self.saving = True
+        self.node.saving_status = True
         self.status_label.setText("data_load")
         self.button_reset.setEnabled(False)
         self.button_save.setEnabled(False)
 
     def data_stop(self):
-        self.saving = False
+        self.node.saving_status  = False
         self.status_label.setText("data_stop")
         self.button_reset.setEnabled(True)
         self.button_save.setEnabled(True)
@@ -286,33 +251,65 @@ class Form(QWidget):
         self.status_label.setText("data_save_start")
         self.file_name = self.file_name_input.text()
         if self.file_name :
-            df = pd.DataFrame(self.data, columns=['Time', 'PWM', 'Force_X', 'Force_Y', 'Force_Z', 'Torque_X', 'Torque_Y', 'Torque_Z'])
-            df.to_excel(f'{self.file_name }.xlsx', index=False)
+            df = pd.DataFrame(self.node.data_sheet_pwm, columns=['Time', 'PWM'])
+            df.to_excel(f'{self.file_name}_pwm.xlsx', index=False)
             print(f'Data saved to {self.file_name }.xlsx')
             self.status_label.setText("data_save_clear")
         else:
             print("Please enter a file name.")
             self.status_label.setText("data_save_failed")
-        
-        self.data = deque()
-        self.status_label.setText("data_reset")
+        if self.file_name :
+            df = pd.DataFrame(self.node.data_sheet_force, columns=['Time', 'Force_X', 'Force_Y', 'Force_Z'])
+            df.to_excel(f'{self.file_name}_force.xlsx', index=False)
+            print(f'Data saved to {self.file_name }.xlsx')
+            self.status_label.setText("data_save_clear")
+        else:
+            print("Please enter a file name.")
+            self.status_label.setText("data_save_failed")
+        if self.file_name :
+            df = pd.DataFrame(self.node.data_sheet_torque, columns=['Time', 'Torque_X', 'Torque_Y', 'Torque_Z'])
+            df.to_excel(f'{self.file_name}_torque.xlsx', index=False)
+            print(f'Data saved to {self.file_name}.xlsx')
+            self.status_label.setText("data_save_clear")
+        else:
+            print("Please enter a file name.")
+            self.status_label.setText("data_save_failed")
+
+        # 데이터 시트 초기화
+        self.node.data_sheet_pwm.clear()
+        self.node.data_sheet_force.clear()
+        self.node.data_sheet_torque.clear()
+            
 
 def run_node(node):
     rclpy.spin(node)
 
 def main(args=None):
-    rclpy.init(args=args)
-    node = DataSaver()
-    node_thread = Thread(target=run_node, args=(node,))
-    node_thread.start()
+    try:
+        rclpy.init(args=args)
+        node = DataSaver()
+        node_thread = Thread(target=run_node, args=(node,))
+        node_thread.start()
 
-    app = QApplication(sys.argv)
-    ex = Form(node)
-    app.exec_()
+        app = QApplication(sys.argv)
+        ex = Form(node)
+        app.exec_()
 
-    node.destroy_node()
-    rclpy.shutdown()
-    node_thread.join()
+        node.destroy_node()
+        rclpy.shutdown()
+        node_thread.join()
+
+    except KeyboardInterrupt:
+        print("Interrupt received! Shutting down.")
+
+    finally:
+        if node:
+            node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+        if node_thread.is_alive():
+            node_thread.join()
+        print("Cleanup complete.")
 
 if __name__ == '__main__':
     main()

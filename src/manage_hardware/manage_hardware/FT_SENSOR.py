@@ -1,21 +1,24 @@
-import numpy as np
-import time
 import serial
-import queue
+import threading
+import time
+from multiprocessing import Queue
 
 class FTSensor:
-    def __init__(self, port='COM10'):
-        self.ser = serial.Serial(
+    def __init__(self, port='/dev/ttyUSB0'):
+        self.sensor = serial.Serial(
             port=port,
             baudrate=115200,
             parity=serial.PARITY_NONE,
             stopbits=serial.STOPBITS_ONE,
             bytesize=serial.EIGHTBITS,
-            timeout=0  # 블로킹 모드로 변경
+            timeout=None  # 블로킹 없이 설정
         )
-        self.decoded = None
         self.running = True
-        self.new_data_available = False
+        self.data_buffer = bytearray()
+        self.lock = threading.Lock()
+        self.sample_rate = 0.005  # 200Hz의 주기, 즉 5ms
+        self.last_time = time.time()
+        self.packet_count = 0
 
     def ft_sensor_init(self):
         # 초기화 데이터 전송 로직
@@ -23,34 +26,14 @@ class FTSensor:
             [0x11, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],  # Bias
             [0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],  # Baud rate
             [0x08, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00],  # Filter
-            [0x0F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]   # output rate
+            [0x0F, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]   # Output rate
         ]
-        try:
-            for command in initial_commands:
-                self.send_data_without_read(command)
-                time.sleep(0.2)
-            print('FT sensor 초기화 성공')
-            return True
-        except Exception as e:
-            print('FT sensor 초기화 실패:', e)
-            return False
+        for command in initial_commands:
+            self.send_data_without_read(command)
+            time.sleep(0.2)
+        print('FT sensor 초기화 성공')
+        return True
 
-    def data_read_and_process(self):
-        while self.running:
-            self.data_read = [0x0A, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00]   # Continuous read
-            data = self.send_data_with_read(self.data_read)
-            try:
-                if data[0] == 0x55 and data[18] == 0xAA:
-                    decoded_data = self.decode_received_data(data)
-                    if decoded_data:
-                        self.decoded = decoded_data
-                        self.new_data_available = True
-                        # print(self.decoded)  # 데이터 처리 결과 출력
-                return self.decoded
-            except:
-                pass
-                return False
-            
     def ft_sensor_continuous_data(self):
         cmd = [0x0B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]   # Continuous read
         try:
@@ -84,35 +67,73 @@ class FTSensor:
             print('FT sensor bias 실패:', e)
             return False
 
+    def start_reading(self):
+        next_reading_time = time.time()
+        while self.running:
+            data = self.sensor.read(100)  # 16바이트 데이터 읽기
+            # print(data)
+            with self.lock:
+                self.data_buffer.extend(data)
+                
+            next_reading_time += self.sample_rate
+
+    def process_data(self):
+        next_process_time = time.time()
+        report_interval = 1.0  # 데이터 처리 속도를 보고하는 간격 (1초)
+        last_report_time = time.time()
+
+        while self.running:
+            with self.lock:
+                if len(self.data_buffer) >= 16:
+                    if self.data_buffer[0] == 0x0B:
+                        packet = self.data_buffer[:16]
+                        self.decoded_force, self.decoded_torque = self.decode_received_data(packet[1:13])
+                        # print(decoded_force, decoded_torque)
+                        self.packet_count += 1
+                        self.data_buffer = self.data_buffer[16:]
+                    else:
+                        self.data_buffer.pop(0)
+
+            # 처리 주파수 보고
+            if time.time() - last_report_time >= report_interval:
+                # print(f'Processed {self.packet_count} packets in the last second.')
+                self.packet_count = 0
+                last_report_time = time.time()
+
+            next_process_time += self.sample_rate
+
     def decode_received_data(self, packet):
         force = [int.from_bytes(packet[i*2:2+i*2], byteorder='big', signed=True) / 50 for i in range(3)]
         torque = [int.from_bytes(packet[6+i*2:8+i*2], byteorder='big', signed=True) / 1000 for i in range(3)]
         return force, torque
 
-    def send_data_with_read(self, data):
-        sop = bytes([0x55])
-        eop = bytes([0xAA])
-        checksum = self.calculate_checksum(data)
-        packet = sop + bytes(data) + bytes([checksum]) + eop
-        self.ser.write(packet)
-        return self.ser.read(19)  # Adjusted to ensure response is
-    
-    
     def send_data_without_read(self, data):
         sop = bytes([0x55])
         eop = bytes([0xAA])
         checksum = self.calculate_checksum(data)
         packet = sop + bytes(data) + bytes([checksum]) + eop
-        self.ser.write(packet)
-        return self.ser.read(19)  # Adjusted to ensure response is captured correctly
+        self.sensor.write(packet)
 
     def calculate_checksum(self, data):
         return sum(data) % 256
 
     def stop(self):
         self.running = False
+        self.sensor.close()
 
 if __name__ == "__main__":
-    ft_sensor = FTSensor()
-    if ft_sensor.ft_sensor_init():
-        ft_sensor.data_read_and_process()
+    ft_sensor = FTSensor('/dev/ttyUSB0')
+    ft_sensor.ft_sensor_init()
+    ft_sensor.ft_sensor_continuous_data()
+    read_thread = threading.Thread(target=ft_sensor.start_reading)
+    process_thread = threading.Thread(target=ft_sensor.process_data)
+    read_thread.start()
+    process_thread.start()
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        ft_sensor.stop()
+        read_thread.join()
+        process_thread.join()

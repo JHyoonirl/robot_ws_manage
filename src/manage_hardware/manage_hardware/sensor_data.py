@@ -1,16 +1,18 @@
-from FT_SENSOR import FTSensor
+from multiprocessing import Process, Queue
 import rclpy
-import sys
 from rclpy.node import Node
-from rclpy.qos import QoSProfile
-
+from rclpy.qos import QoSProfile, QoSHistoryPolicy, QoSReliabilityPolicy
+from FT_SENSOR import FTSensor
 import time
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QSpinBox, QLabel
 from threading import Thread
+import threading
 from std_msgs.msg import Bool, Float64
-from geometry_msgs.msg import Vector3
+from geometry_msgs.msg import Vector3Stamped
 from custominterface.srv import Status
 from datetime import datetime
+from builtin_interfaces.msg import Time
+import sys
 
 
 class Sensor(Node):
@@ -19,94 +21,103 @@ class Sensor(Node):
         self.declare_parameter('usb_port', '/dev/ttyUSB0')
         usb_port = self.get_parameter('usb_port').get_parameter_value().string_value
         self.qos_profile = QoSProfile(depth=10)
+        # self.qos_profile = QoSProfile(history = QoSHistoryPolicy.KEEP_LAST, depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
 
 
         self.sensor = FTSensor(port=usb_port)
-        self.serial_port = self.sensor.ser
+
+        # self.serial_port = self.sensor.sensor
         self.init_status = self.init_sensor()
+        self.decoded_force = None
+        self.decoded_torque = None
 
         # 데이터 퍼블리싱을 위한 퍼블리셔 설정
-        self.force_publisher = self.create_publisher(Vector3, 'force_data', 10)
-        self.torque_publisher = self.create_publisher(Vector3, 'torque_data', 10)
-        self.sensor_time = self.create_publisher(Float64, 'sensor_time', 10)
-
+        self.force_publisher = self.create_publisher(Vector3Stamped, 'force_data', self.qos_profile)
+        self.torque_publisher = self.create_publisher(Vector3Stamped, 'torque_data', self.qos_profile)
+        # self.sensor_time = self.create_publisher(Float64, 'sensor_time', self.qos_profile)
+        # self.pwm_sub = self.create_subscription(
+        #     Float64,
+        #     'pwm_signal',
+        #     self.pwm_subscriber,
+        #     self.qos_profile)
         # self.sensor_sub = self.create_subscription(Float64, 'sensor_test', self.sensor_test_fcn, self.qos_profile)
         self.test_switch = False
         self.sensor_test_msg = 3
 
         self.data_on = False
-        # self.test_bias = False
+        self.test_bias = False
+        self.data_buffer = bytearray()
+        self.lock = threading.Lock()
+        self.packet_count = 0
         
-
         if self.init_status:
-            self.get_logger().info('sensor booting success')
-            # 0.005초 간격으로 publish_sensor 호출
-            self.timer = self.create_timer(0.0001, self.publish_sensor)
+            # self.read_thread = Thread(target=self.sensor.start_reading, daemon=True)
+            # self.process_thread = Thread(target=self.sensor.process_data, daemon=True)
+            
+            self.timer = self.create_timer(0.005, self.publish_sensor)
+        
         
     def init_sensor(self):
         if not self.sensor.ft_sensor_init():
-            self.get_logger().error('Failed to initialize sensor')
+            # self.get_logger().error('Failed to initialize sensor')
+            self.get_logger().info('Failed to initialize sensor')
             return False
         else:
+            self.sensor.ft_sensor_continuous_data()
             return True
-        
+            
     def publish_sensor(self):
-        if not self.data_on:
-            return  # 데이터 전송이 활성화되지 않았다면 종료
+        pass
         
-        force = Vector3()
-        torque = Vector3()
-        time_ = Float64()
-        try:
-            if self.serial_port.in_waiting >= 14:
-                data = self.serial_port.read(1)  # 1바이트 읽기
-                # self.get_logger().info(data)
-                if data and data[0] == 0x0B:  # 특정 데이터 값 확인
-                    data_received = self.serial_port.read(13)  # 추가 데이터 읽기
-                    decoded_force, decoded_torque = self.sensor.decode_received_data(data_received)
-                    force.x, force.y, force.z = decoded_force
-                    torque.x, torque.y, torque.z = decoded_torque
-                    # self.get_logger().info(f'data: {force, torque}')
-                    self.force_publisher.publish(force)  # 데이터 퍼블리시
-                    self.torque_publisher.publish(torque)
+    def start_reading(self):
+        # next_reading_time = time.time()
+        while True:
+            self.next_process_time = time.time()
+            data = self.sensor.sensor.read(50)  # 16바이트 데이터 읽기
+            # print(data)
+            with self.lock:
+                self.data_buffer.extend(data)
+             # 다음 데이터 처리 시간을 기다립니다.
+            self.next_process_time += 0.005
+            sleep_time = self.next_process_time - time.time()
+            # if sleep_time > 0:
+                # time.sleep(sleep_time)
+                
+    def process_data(self):
+        while True:
+            with self.lock:
+                if len(self.data_buffer) >= 16:
+                    if self.data_buffer[0] == 0x0B:
+                        packet = self.data_buffer[:16]
+                        self.decoded_force, self.decoded_torque = self.sensor.decode_received_data(packet[1:13])
+                        self.packet_count += 1
+                        self.data_buffer = self.data_buffer[16:]
+                        now = self.get_clock().now()  # 현재 시간을 한 번만 계산
+                            
+                        # 모든 메시지 생성
+                        time_msg = Float64()
+                        force_msg = Vector3Stamped()
+                        torque_msg = Vector3Stamped()
 
-                    time_.data = float(datetime.now().timestamp())
-                    self.sensor_time.publish(time_)
-        except Exception as e:
-            pass
-            # self.get_logger().error(f'Error reading sensor data: {e}')
+                        # 모든 메시지에 동일한 시간 스탬프 적용
+                        force_msg.header.stamp = now.to_msg()
+                        torque_msg.header.stamp = now.to_msg()
+                        time_msg.data = float(now.nanoseconds) / 1e9  # 나노초를 초로 변환
+                        if self.data_on and self.decoded_force != None and self.decoded_torque != None:
+                            # 데이터 할당
+                            force_msg.vector.x, force_msg.vector.y, force_msg.vector.z = self.decoded_force[:]
+                            torque_msg.vector.x, torque_msg.vector.y, torque_msg.vector.z = self.decoded_torque[:]
+                            force_msg.header.frame_id = 'force_frame'
+                            torque_msg.header.frame_id = 'torque_frame'
 
-    def sensor_test_fcn(self, msg):
-        if self.sensor_test_msg != msg.data:
-            self.test_switch = True
-            self.sensor_test_msg = msg.data
-
-        # self.sensor_test_msg = msg.data
-        
-        if self.sensor_test_msg == 1 and self.test_switch:
-            self.data_on = False
-            try:
-                self.sensor.ft_sensor_stop_data()
-                self.get_logger().info('sensor stop')
-            except:
-                self.get_logger().info('sensor stop fail')
-            time.sleep(0.5)
-            # self.sensor.ft_sensor_bias_set()
-            try:
-                self.sensor.ft_sensor_bias_set()
-                self.get_logger().info('sensor bias set')
-            except:
-                self.get_logger().info('sensor bias set fail')
-            self.test_switch = False
-        elif self.sensor_test_msg == 2 and self.test_switch:
-            self.data_on = True
-            try:
-                self.sensor.ft_sensor_continuous_data()
-                self.get_logger().info('sensor data start')
-            except:
-                self.get_logger().info('sensor data startfail')
-            self.test_switch = False
-            # self.sensor.ft_sensor_continuous_data()
+                            # 데이터 발행
+                            self.force_publisher.publish(force_msg)
+                            self.torque_publisher.publish(torque_msg)
+                            # self.sensor_time.publish(time_msg)
+                        time.sleep(0.0005)
+                    else:
+                        self.data_buffer.pop(0)
+            
 
 class SensorApp(QWidget):
     def __init__(self, node):
@@ -152,7 +163,13 @@ def main(args=None):
     rclpy.init(args=args)
     node = Sensor()
     thread = Thread(target=rclpy.spin, args=(node,), daemon=True)
+    read_thread = Thread(target=node.start_reading, daemon=True)
+    process_thread = Thread(target=node.process_data, daemon=True)
     thread.start()
+    time.sleep(2)
+    if node.init_status:
+        read_thread.start()
+        process_thread.start()
 
     app = QApplication(sys.argv)
     ex = SensorApp(node)
