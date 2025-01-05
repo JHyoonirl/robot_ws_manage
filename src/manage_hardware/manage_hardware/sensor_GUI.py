@@ -158,4 +158,5 @@ if __name__ == '__main__':
     sensor_thread = threading.Thread(target=sensor.data_process, daemon=True)
     sensor_thread.start()
     ex = SensorApp(sensor)
+    
     sys.exit(app.exec_())

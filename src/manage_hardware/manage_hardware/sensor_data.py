@@ -2,7 +2,8 @@ from multiprocessing import Process, Queue
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, QoSHistoryPolicy, QoSReliabilityPolicy
-from FT_SENSOR import FTSensor
+# from FT_SENSOR import FTSensor
+from sensor_GUI import Sensor, SensorApp
 import time
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QSpinBox, QLabel
 from threading import Thread
@@ -15,7 +16,7 @@ from builtin_interfaces.msg import Time
 import sys
 
 
-class Sensor(Node):
+class FTSENSOR(Node):
     def __init__(self):
         super().__init__('FT_data')
         self.declare_parameter('usb_port', '/dev/ttyUSB0')
@@ -24,7 +25,7 @@ class Sensor(Node):
         # self.qos_profile = QoSProfile(history = QoSHistoryPolicy.KEEP_LAST, depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
 
 
-        self.sensor = FTSensor(port=usb_port)
+        # self.sensor = Sensor(port=usb_port)
 
         # self.serial_port = self.sensor.sensor
         self.init_status = self.init_sensor()
@@ -161,21 +162,21 @@ class SensorApp(QWidget):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = Sensor()
-    thread = Thread(target=rclpy.spin, args=(node,), daemon=True)
-    read_thread = Thread(target=node.start_reading, daemon=True)
-    process_thread = Thread(target=node.process_data, daemon=True)
+    sensor = Sensor()
+    thread = Thread(target=rclpy.spin, args=(sensor,), daemon=True)
+    sensor_data_read_thread = Thread(target=sensor.data_process, daemon=True)
+    # process_thread = Thread(target=node.process_data, daemon=True)
     thread.start()
-    time.sleep(2)
-    if node.init_status:
-        read_thread.start()
-        process_thread.start()
+    time.sleep(1)
+    if sensor.init_status:
+        sensor_data_read_thread.start()
+        # process_thread.start()
 
     app = QApplication(sys.argv)
-    ex = SensorApp(node)
+    ex = SensorApp(sensor)
     app.exec_()
     
-    node.destroy_node()
+    sensor.destroy_node()
     rclpy.shutdown()
     thread.join()
 
