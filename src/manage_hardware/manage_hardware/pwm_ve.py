@@ -20,9 +20,11 @@ class PwmClient(Node):
         self.pwm = 50.0  # 초기 PWM 값 설정
         self.pwm_response = False  # 서비스 응답 상태 초기화
 
-        self.pwm_time = self.create_publisher(Float64, 'pwm_time', qos_profile)
+        # 실험을 위해 주석 처리
+        # self.pwm_time = self.create_publisher(Float64, 'pwm_time', qos_profile)
 
-        self.timer = self.create_timer(0.005, self.publish_pwm)
+        # 실험을 위해 주석 처리
+        # self.timer = self.create_timer(0.005, self.publish_pwm)
 
     def send_request(self, pwm_switch):
         req = Status.Request()
