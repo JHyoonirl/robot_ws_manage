@@ -10,7 +10,7 @@ print(os.getcwd())
 import argparse
 
 
-class SensorApp(QMainWindow):
+class SensorApp_GUI(QMainWindow):
     def __init__(self, sensor):
         QMainWindow.__init__(self)
         self.sensor = sensor
@@ -21,7 +21,7 @@ class SensorApp(QMainWindow):
         
         self.force_data = [[], [], []]  # 각 축의 힘 데이터를 저장하는 리스트
         self.torque_data = [[], [], []]  # 각 축의 토크 데이터를 저장하는 리스트
-        self.show()
+        # self.show()
 
     def init_ui(self):
 
@@ -133,7 +133,7 @@ class SensorApp(QMainWindow):
     def close(self):
         sys.exit()
 
-class Sensor:
+class Sensor_GUI:
     def __init__(self, port='COM10'):
         self.sensor = FTSensor(port=port)
         self.init_status = self.sensor.ft_sensor_init()
@@ -154,9 +154,9 @@ if __name__ == '__main__':
     parser.add_argument('--port', type=str, default='COM8', help='Serial port to connect to')
     args = parser.parse_args()
     app = QApplication(sys.argv)
-    sensor = Sensor(args.port)
+    sensor = Sensor_GUI(args.port)
     sensor_thread = threading.Thread(target=sensor.data_process, daemon=True)
     sensor_thread.start()
-    ex = SensorApp(sensor)
-    
+    ex = SensorApp_GUI(sensor)
+    ex.show()
     sys.exit(app.exec_())
