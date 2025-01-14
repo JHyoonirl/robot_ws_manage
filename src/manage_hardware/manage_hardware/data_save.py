@@ -153,7 +153,7 @@ class Form(QWidget):
         # QTimer to periodically update the data
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_data)
-        self.timer.start(5)  # Update every 10ms
+        # self.timer.start(5)  # Update every 10ms
 
         # Main layout setup
         main_layout = QVBoxLayout()
@@ -256,7 +256,7 @@ class Form(QWidget):
     def data_save(self):
         self.status_label.setText("Data save start")
         # self.file_name = self.file_name_input.text()
-        self.file_name = str('{0}_{1}'.format(self.pwm, float(self.file_name_input.text())))
+        self.file_name = str('{0}_{1}'.format(int(self.pwm), int(self.file_name_input.text())))
         if self.file_name:
             try:
                 # PWM, Force, Torque 데이터 프레임 생성
@@ -264,14 +264,18 @@ class Form(QWidget):
                 df_force = pd.DataFrame(self.node.data_sheet_force, columns=['Time', 'Force_X', 'Force_Y', 'Force_Z'])
                 df_torque = pd.DataFrame(self.node.data_sheet_torque, columns=['Time', 'Torque_X', 'Torque_Y', 'Torque_Z'])
                 
+
+                df_pwm.to_excel(f'{self.file_name}_pwm.xlsx', index=False)
+                df_force.to_excel(f'{self.file_name}_force.xlsx', index=False)
+                df_torque.to_excel(f'{self.file_name}_torque.xlsx', index=False)
                 # 세 데이터 프레임을 시간 열을 기준으로 합치기
-                df_merged = pd.merge(pd.merge(df_pwm, df_force, on='Time', how='outer'), df_torque, on='Time', how='outer')
+                # df_merged = pd.merge(pd.merge(df_pwm, df_force, on='Time', how='outer'), df_torque, on='Time', how='outer')
                 
                 # 누락된 데이터가 있는 행 제거
-                df_cleaned = df_merged.dropna()
+                # df_cleaned = df_merged.dropna()
 
                 # Excel 파일로 저장
-                df_cleaned.to_excel(f'{self.file_name}.xlsx', index=False)
+                # df_merged.to_excel(f'{self.file_name}.xlsx', index=False)
                 print(f'Data saved to {self.file_name}.xlsx')
                 self.status_label.setText("Data save complete")
             except Exception as e:
