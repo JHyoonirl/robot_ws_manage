@@ -27,13 +27,15 @@ setup(
     tests_require=['pytest'],
     entry_points={ 
         'console_scripts': [
-            'sensor_data = manage_hardware.sensor_data:main',
+            'sensor_operator = manage_hardware.sensor_operator:main',
             'sensor_graph = manage_hardware.sensor_graph:main',
             'visual_data = manage_hardware.sensor_graph:main',
             'rasp_pi_pwm = manage_hardware.rasp_pi_pwm:main',
-            'pwm_ve = manage_hardware.pwm_ve:main',
+            'thruster_operator = manage_hardware.thruster_operator:main',
             'data_load = manage_hardware.data_load:main',
             'data_save = manage_hardware.data_save:main',
+            'rmd_operator = manage_hardware.rmd_operator:main',
+
         ],
     },
 )

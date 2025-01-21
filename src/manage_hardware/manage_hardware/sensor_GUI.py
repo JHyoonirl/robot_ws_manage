@@ -6,7 +6,7 @@ import sys
 import os
 import threading
 from pyqtgraph import PlotWidget  # 그래프를 위한 라이브러리
-print(os.getcwd())
+# print(os.getcwd())
 import argparse
 
 

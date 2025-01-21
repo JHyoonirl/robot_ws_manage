@@ -20,7 +20,7 @@ import sys
 
 class Sensor(Node):
     def __init__(self):
-        super().__init__('FT_data')
+        super().__init__('sensor_operator')
         self.declare_parameter('usb_port', '/dev/ttyUSB0')
         usb_port = self.get_parameter('usb_port').get_parameter_value().string_value
         self.qos_profile = QoSProfile(depth=10)
@@ -103,17 +103,17 @@ class Sensor(Node):
                         self.decoded_force, self.decoded_torque = self.sensor.decode_received_data(packet[1:13])
                         self.packet_count += 1
                         self.data_buffer = self.data_buffer[16:]
-                        now = self.get_clock().now()  # 현재 시간을 한 번만 계산
+                        # now = self.get_clock().now()  # 현재 시간을 한 번만 계산
                             
                         # 모든 메시지 생성
-                        time_msg = Float64()
+                        # time_msg = Float64()
                         force_msg = Vector3()
                         torque_msg = Vector3()
 
                         # 모든 메시지에 동일한 시간 스탬프 적용
                         # force_msg.header.stamp = now.to_msg()
                         # torque_msg.header.stamp = now.to_msg()
-                        time_msg.data = float(now.nanoseconds) / 1e9  # 나노초를 초로 변환
+                        # time_msg.data = float(now.nanoseconds) / 1e9  # 나노초를 초로 변환
                         if self.data_on and self.decoded_force != None and self.decoded_torque != None:
                             # 데이터 할당
                             force_msg.x, force_msg.y, force_msg.z = self.decoded_force[:]

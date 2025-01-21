@@ -6,12 +6,13 @@ from std_msgs.msg import Float64
 from rclpy.qos import QoSProfile, QoSHistoryPolicy, QoSReliabilityPolicy
 from geometry_msgs.msg import Vector3
 from std_msgs.msg import Bool
-from PyQt5.QtWidgets import QApplication, QVBoxLayout, QWidget, QLabel, QLineEdit, QGroupBox, QPushButton, QHBoxLayout
-from PyQt5.QtCore import QTimer, QDateTime
+from PyQt5.QtWidgets import QApplication, QVBoxLayout, QWidget, QLabel, QLineEdit, QGroupBox, QPushButton, QHBoxLayout, QMainWindow, QCheckBox, QTextBrowser
+from PyQt5.QtCore import QTimer, QDateTime, Qt
 from threading import Thread, Lock
 from collections import deque
 import datetime
 import time
+from PyQt5 import uic
 
 class DataSaver(Node):
     def __init__(self):
@@ -41,9 +42,11 @@ class DataSaver(Node):
         self.data_sheet_pwm = deque()
         self.data_sheet_force = deque()
         self.data_sheet_torque = deque()
+        self.data_sheet_motor = deque()
 
         self.force_ = ()
         self.torque_ = ()
+        self.motor_ = ()
 
         
         self.pwm_pub = self.create_publisher(Float64, 'pwm_signal', self.qos_profile)
@@ -142,119 +145,117 @@ class DataSaver(Node):
         if self.saving_status:
             current_time = time.time()
 
-class Form(QWidget):
+class DataSaveApp(QMainWindow):
     def __init__(self, node):
         super().__init__()
         self.node = node
         self.data = deque()  # Using deque for more efficient append operations
         self.saving = False
         self.pwm = 0.0
+        self.ui = uic.loadUi('UI/data_save.ui', self)
+        self.init_ui()
 
+        self.thruster_status = 0
+        self.sensor_status = 0
+        self.motor_status = 0
+
+    def init_ui(self):
         # QTimer to periodically update the data
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_data)
-        # self.timer.start(5)  # Update every 10ms
+        self.timer.start(5)  # Update every 5ms --> 수정 필요함!!!!
 
         # Main layout setup
-        main_layout = QVBoxLayout()
+        # main_layout = QVBoxLayout()
 
-        # Group boxes for PWM, Force, and Torque values
-        self.label_pwm = QLabel('0.0', self)
-        self.label_force_x = QLabel('0.0', self)
-        self.label_force_y = QLabel('0.0', self)
-        self.label_force_z = QLabel('0.0', self)
-        self.label_torque_x = QLabel('0.0', self)
-        self.label_torque_y = QLabel('0.0', self)
-        self.label_torque_z = QLabel('0.0', self)
+        # check boxes
+        self.Thruster_data_checkbox = self.findChild(QCheckBox, 'thruster_check')
+        self.Sensor_data_checkbox = self.findChild(QCheckBox, 'sensor_check')
+        self.Motor_data_checkbox = self.findChild(QCheckBox, 'motor_check')
 
-        # Group box layout
-        horizontal_layout = QHBoxLayout()
-        horizontal_layout.addWidget(self.create_group_box('PWM', self.label_pwm))
-        horizontal_layout.addWidget(self.create_group_box('Force X', self.label_force_x))
-        horizontal_layout.addWidget(self.create_group_box('Force Y', self.label_force_y))
-        horizontal_layout.addWidget(self.create_group_box('Force Z', self.label_force_z))
-        horizontal_layout.addWidget(self.create_group_box('Torque X', self.label_torque_x))
-        horizontal_layout.addWidget(self.create_group_box('Torque Y', self.label_torque_y))
-        horizontal_layout.addWidget(self.create_group_box('Torque Z', self.label_torque_z))
-        main_layout.addLayout(horizontal_layout)
+        self.Thruster_data_checkbox.setCheckState(True)
+        self.Sensor_data_checkbox.setCheckState(True)
+        self.Motor_data_checkbox.setCheckState(True)
 
-        # Buttons
-        button_layout = QHBoxLayout()
+        self.Thruster_data_checkbox.stateChanged.connect(self.thruster_checked)
+        self.Sensor_data_checkbox.stateChanged.connect(self.sensor_checked)
+        self.Motor_data_checkbox.stateChanged.connect(self.motor_checked)
 
-        self.status_label = QLabel("Login", self)
-        
-        # self.button_test_auto = QPushButton('test_auto', self)
-        # self.button_test_auto.clicked.connect(self.test_auto)
-        self.button_reset = QPushButton('Data Reset', self)
-        self.button_reset.clicked.connect(self.data_reset)
-        self.button_load = QPushButton('Data Load', self)
-        self.button_load.clicked.connect(self.data_load)
-        self.button_stop = QPushButton('Data Stop', self)
-        self.button_stop.clicked.connect(self.data_stop)
-        self.button_save = QPushButton('Data Save', self)
-        self.button_save.clicked.connect(self.data_save)
-        self.button_auto_save = QPushButton('Data Auto Saver', self)
-        self.button_auto_save.clicked.connect(self.button_auto_saver)
-        self.file_name_input = QLineEdit(self)
-        self.file_name_input.setPlaceholderText('Enter file name')
-        # self.file_name_test = QLineEdit(self)
-        # self.file_name_test.setPlaceholderText('Enter test iteration')
+        # buttons
+        self.data_reset_btn = self.findChild(QPushButton, 'data_reset')
+        self.data_load_btn = self.findChild(QPushButton, 'data_load')
+        self.data_stop_btn = self.findChild(QPushButton, 'data_stop')
+        self.data_save_btn = self.findChild(QPushButton, 'data_save')
 
-        button_layout.addWidget(self.status_label)
-        # button_layout.addWidget(self.button_test_auto)
-        button_layout.addWidget(self.button_reset)
-        button_layout.addWidget(self.button_load)
-        button_layout.addWidget(self.button_stop)
-        button_layout.addWidget(self.button_save)
-        button_layout.addWidget(self.button_auto_save)
-        button_layout.addWidget(self.file_name_input)
-        # button_layout.addWidget(self.file_name_test)
-        main_layout.addLayout(button_layout)
+        self.data_reset_btn.clicked.connect(self.data_reset)
+        self.data_load_btn.clicked.connect(self.data_load)
+        self.data_stop_btn.clicked.connect(self.data_stop)
+        self.data_save_btn.clicked.connect(self.data_save)
 
-        self.setLayout(main_layout)
-        self.setWindowTitle('Data Save')
-        self.resize(800, 200)
-        
-        self.show()
-        QApplication.processEvents()
-        self.move(0, 0)
+        # text browsers
+        self.Thruster_data_text = self.findChild(QTextBrowser, 'thruster_check')
+        self.Sensor_data_text = self.findChild(QTextBrowser, 'sensor_check')
+        self.Motor_data_text = self.findChild(QTextBrowser, 'motor_check')
+        self.Save_status_text = self.findChild(QTextBrowser, 'save_status')
 
-    def create_group_box(self, title, label):
-        group_box = QGroupBox(title)
-        layout = QVBoxLayout()
-        layout.addWidget(label)
-        group_box.setLayout(layout)
-        return group_box
 
     def update_data(self):
         # with self.node.data_lock:
-        self.label_pwm.setText(f'{self.node.pwm:.2f}')
-        self.label_force_x.setText(f'{self.node.force_x:.2f}')
-        self.label_force_y.setText(f'{self.node.force_y:.2f}')
-        self.label_force_z.setText(f'{self.node.force_z:.2f}')
-        self.label_torque_x.setText(f'{self.node.torque_x:.2f}')
-        self.label_torque_y.setText(f'{self.node.torque_y:.2f}')
-        self.label_torque_z.setText(f'{self.node.torque_z:.2f}')
+        if self.thruster_status == True:
+            self.Thruster_data_text.setPlainText(f'{self.node.pwm:.2f}')
+        else:
+            self.Thruster_data_text.clear()
+
+        if self.sensor_status == True:
+            self.Sensor_data_text.setPlainText(f'force: {self.node.force_x:.2f}, {self.node.force_y:.2f}, {self.node.force_z:.2f}')
+            self.Sensor_data_text.append(f'torque: {self.node.torque_x:.2f}, {self.node.torque_y:.2f}, {self.node.torque_z:.2f}')
+        else:
+            self.Sensor_data_text.clear()
+
+        if self.motor_status == True:
+            self.Motor_data_text.setPlainText(f'{self.node.pwm:.2f}')
+        else:
+            self.Motor_data_text.clear()
+    
+    def thruster_checked(self, state):
+        if state == Qt.Checked:
+            self.thruster_status = True
+        else:
+            self.thruster_status = False
+
+    def sensor_checked(self, state):
+        if state == Qt.Checked:
+            self.sensor_status = True
+        else:
+            self.sensor_status = False
+
+    def motor_checked(self, state):
+        if state == Qt.Checked:
+            self.motor_status = True
+        else:
+            self.motor_status = False
+
+
 
     def data_reset(self):
         # self.saving = True
         self.node.data_sheet = deque()
-        self.status_label.setText("data_reset")
+        self.Save_status_text.setText("data_reset")
     
     def data_load(self):
         self.node.saving_status = True
-        self.status_label.setText("data_load")
-        self.button_reset.setEnabled(False)
-        self.button_save.setEnabled(False)
+        self.Save_status_text.setText("data_load")
+        self.data_reset_btn.setEnabled(False)
+        self.data_save_btn.setEnabled(False)
 
     def data_stop(self):
         self.node.saving_status  = False
-        self.status_label.setText("data_stop")
-        self.button_reset.setEnabled(True)
-        self.button_save.setEnabled(True)
+        self.Save_status_text.setText("data_stop")
+        self.data_reset_btn.setEnabled(True)
+        self.data_save_btn.setEnabled(True)
     
     def data_save(self):
-        self.status_label.setText("Data save start")
+        self.Save_status_text.setText("Data save start")
         # self.file_name = self.file_name_input.text()
         self.file_name = str('{0}_{1}'.format(int(self.pwm), int(self.file_name_input.text())))
         if self.file_name:
@@ -277,18 +278,19 @@ class Form(QWidget):
                 # Excel 파일로 저장
                 # df_merged.to_excel(f'{self.file_name}.xlsx', index=False)
                 print(f'Data saved to {self.file_name}.xlsx')
-                self.status_label.setText("Data save complete")
+                self.Save_status_text.setText("Data save complete")
             except Exception as e:
                 print(f"Error saving data: {e}")
-                self.status_label.setText("Data save failed")
+                self.Save_status_text.setText("Data save failed")
         else:
             print("Please enter a file name.")
-            self.status_label.setText("Data save failed")
+            self.Save_status_text.setText("Data save failed")
 
         # 데이터 시트 초기화
         self.node.data_sheet_pwm.clear()
         self.node.data_sheet_force.clear()
         self.node.data_sheet_torque.clear()
+        self.node.data_sheet_motor.clear()
     def button_auto_saver(self):
         for i in range(0, 101, 5):
             self.data_reset()
@@ -323,7 +325,7 @@ def main(args=None):
         node_thread.start()
 
         app = QApplication(sys.argv)
-        ex = Form(node)
+        ex = DataSaveApp(node)
         app.exec_()
 
         node.destroy_node()
