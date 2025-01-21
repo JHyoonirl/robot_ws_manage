@@ -5,7 +5,7 @@ from rclpy.node import Node
 from std_msgs.msg import Float64
 from rclpy.qos import QoSProfile, QoSHistoryPolicy, QoSReliabilityPolicy
 from geometry_msgs.msg import Vector3
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool, Float64MultiArray
 from PyQt5.QtWidgets import QApplication, QVBoxLayout, QWidget, QLabel, QLineEdit, QGroupBox, QPushButton, QHBoxLayout, QMainWindow, QCheckBox, QTextBrowser
 from PyQt5.QtCore import QTimer, QDateTime, Qt
 from threading import Thread, Lock
@@ -16,30 +16,33 @@ from PyQt5 import uic
 
 class DataSaver(Node):
     def __init__(self):
-        super().__init__('pwm_botton')
+        super().__init__('data_saver')
         # self.qos_profile = QoSProfile(history = QoSHistoryPolicy.KEEP_LAST, depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
         self.qos_profile = QoSProfile(depth=10)
         self.qos_profile_ = QoSProfile(depth=100)
-        self.pwm = 50.0
-        self.pwm_timestamp = 0.0
+        self.thruster_signal = 50.0
+        self.thruster_signal_timestamp = 0.0
 
         self.force_x = self.force_y = self.force_z = 0.0
         self.torque_x = self.torque_y = self.torque_z = 0.0
+        self.votage = self.angle = self.velocity = 0.0
         
         # self.prev_pwm = None
-        self.prev_force = (None, None, None)
-        self.prev_torque = (None, None, None)
+        # self.prev_force = (None, None, None)
+        # self.prev_torque = (None, None, None)
         self.sensor_time = 0
         self.force_packet = 0
         self.torque_packet = 0
         self.force_timestamp = 0.0
         self.torque_timestamp = 0.0
         self.saving_status = False
-        self.last_pwm_save_time = time.time()
-        self.last_force_save_time = time.time()
-        self.last_torque_save_time = time.time()
 
-        self.data_sheet_pwm = deque()
+
+        self.thruster_status = 0
+        self.sensor_status = 0
+        self.motor_status = 0
+
+        self.data_sheet_thruster_signal = deque()
         self.data_sheet_force = deque()
         self.data_sheet_torque = deque()
         self.data_sheet_motor = deque()
@@ -49,19 +52,13 @@ class DataSaver(Node):
         self.motor_ = ()
 
         
-        self.pwm_pub = self.create_publisher(Float64, 'pwm_signal', self.qos_profile)
+        # self.Thruster_publisher = self.create_publisher(Float64, 'Thruster_signal', self.qos_profile) # 실험을 위해 주석 처리
         
-        self.pwm_sub = self.create_subscription(
+        self.thruster_sub = self.create_subscription(
             Float64,
-            'pwm_signal',
-            self.pwm_subscriber,
+            'Thruster_signal',
+            self.thruster_subscriber,
             self.qos_profile)
-        
-        # self.pwm_time_sub = self.create_subscription(
-        #     Float64,
-        #     'pwm_time',
-        #     self.pwm_time_subsciber,
-        #     self.qos_profile)
         
         self.force_sub = self.create_subscription(
             Vector3,
@@ -75,53 +72,53 @@ class DataSaver(Node):
             self.torque_subscriber,
             self.qos_profile_)
         
-        # self.sensor_time_sub = self.create_subscription(
-        #     Float64,
-        #     'sensor_time',
-        #     self.sensor_time_subsciber,
-        #     self.qos_profile)
+        self.motor_sub = self.create_subscription(
+            Float64MultiArray,
+            'Motor_info',
+            self.motor_subscriber,
+            self.qos_profile_)
 
         # Lock for thread safety when accessing node data
         self.data_lock = Lock()
-        self.timer_1 = self.create_timer(0.005, self.data_saver)
-        self.timer_2 = self.create_timer(0.005, self.pwm_publisher)
+        # self.timer_1 = self.create_timer(0.005, self.data_saver)
+        # self.timer_2 = self.create_timer(0.005, self.thruster_pub) # 실험을 위해 주석 처리
 
-    def pwm_publisher(self):
+    def thruster_pub(self):
         msg = Float64()
 
-        msg.data = self.pwm
-        self.pwm_pub.publish(msg)
+        msg.data = self.thruster_signal
+        self.Thruster_publisher.publish(msg)
 
-    def pwm_subscriber(self, msg):
+    def thruster_subscriber(self, msg):
         # with self.data_lock:
-        self.pwm = msg.data
-        self.pwm_timestamp = time.time()
-        if self.saving_status:
-            dt_object = datetime.datetime.fromtimestamp(self.pwm_timestamp)
+        self.thruster_signal = msg.data
+        self.thruster_signal_timestamp = time.time()
+        if self.saving_status and self.thruster_status == True:
+            dt_object = datetime.datetime.fromtimestamp(self.thruster_signal_timestamp)
             formatted_time = dt_object.strftime('%H:%M:%S.%f')[:-3]  # .%f는 마이크로세컨드까지 포함하므로, 마지막 3자리를 잘라 밀리세컨드로 사용
 
-            data_entry = [formatted_time, self.pwm]
-            self.data_sheet_pwm.append(data_entry)
-            self.last_pwm_save_time = time.time()
+            data_entry = [formatted_time, self.thruster_signal]
+            self.data_sheet_thruster_signal.append(data_entry)
+            # self.last_pwm_save_time = time.time()
 
     def force_subscriber(self, msg):
         # with self.data_lock:
         self.force_x, self.force_y, self.force_z = msg.x, msg.y, msg.z
         self.force_timestamp = time.time()
-        if self.saving_status:
+        if self.saving_status and self.sensor_status == True:
             dt_object = datetime.datetime.fromtimestamp(self.force_timestamp)
             formatted_time = dt_object.strftime('%H:%M:%S.%f')[:-3]
             
             data_entry = [formatted_time, self.force_x, self.force_y, self.force_z]
             self.data_sheet_force.append(data_entry)
-            self.last_force_save_time = time.time()
+            # self.last_force_save_time = time.time()
                 
 
     def torque_subscriber(self, msg):
         # with self.data_lock:
         self.torque_x, self.torque_y, self.torque_z = msg.x, msg.y, msg.z
         self.torque_timestamp = time.time()
-        if self.saving_status:
+        if self.saving_status and self.sensor_status == True:
             dt_object = datetime.datetime.fromtimestamp(self.torque_timestamp)
             formatted_time = dt_object.strftime('%H:%M:%S.%f')[:-3]
             
@@ -130,20 +127,22 @@ class DataSaver(Node):
 
             data_entry = [formatted_time, self.torque_x, self.torque_y, self.torque_z]
             self.data_sheet_torque.append(data_entry)
-            self.last_force_save_time = time.time()
+            # self.last_force_save_time = time.time()
 
-    # def sensor_time_subsciber(self, msg):
-    #     # with self.data_lock:
-    #     self.sensor_time = msg.data
+    def motor_subscriber(self, msg):
+        # with self.data_lock:
+        self.votage, self.angle, self.velocity = msg.data
+        self.motor_timestamp = time.time()
+        if self.saving_status and self.motor_status == True:
+            dt_object = datetime.datetime.fromtimestamp(self.motor_timestamp)
+            formatted_time = dt_object.strftime('%H:%M:%S.%f')[:-3]
+            
+            # 시간, 분, 초, 밀리세컨드를 포함하는 문자열 형식으로 반환합니다.
+            # formatted_time = now.strftime("%H:%M:%S.%f")[:-3]  # .%f는 마이크로세컨드까지 포함하므로, 마지막 3자리를 잘라 밀리세컨드로 사용
 
-    # def pwm_time_subsciber(self, msg):
-    #     # with self.data_lock:
-    #     self.pwm_time = msg.data
-
-    def data_saver(self):
-        # time_delay = self.sensor_time - self.pwm_time
-        if self.saving_status:
-            current_time = time.time()
+            data_entry = [formatted_time, self.votage, self.angle, self.velocity]
+            self.data_sheet_motor.append(data_entry)
+            # self.last_force_save_time = time.time()
 
 class DataSaveApp(QMainWindow):
     def __init__(self, node):
@@ -151,7 +150,7 @@ class DataSaveApp(QMainWindow):
         self.node = node
         self.data = deque()  # Using deque for more efficient append operations
         self.saving = False
-        self.pwm = 0.0
+        self.thruster_signal = 0.0
         self.ui = uic.loadUi('UI/data_save.ui', self)
         self.init_ui()
 
@@ -202,7 +201,7 @@ class DataSaveApp(QMainWindow):
     def update_data(self):
         # with self.node.data_lock:
         if self.thruster_status == True:
-            self.Thruster_data_text.setPlainText(f'{self.node.pwm:.2f}')
+            self.Thruster_data_text.setPlainText(f'{self.node.thruster_signal:.2f}')
         else:
             self.Thruster_data_text.clear()
 
@@ -213,29 +212,34 @@ class DataSaveApp(QMainWindow):
             self.Sensor_data_text.clear()
 
         if self.motor_status == True:
-            self.Motor_data_text.setPlainText(f'{self.node.pwm:.2f}')
+            # self.votage = self.angle = self.velocity
+            self.Motor_data_text.setPlainText(f'motor: {self.node.votage:.2f}, {self.node.angle:.2f}, {self.node.velocity:.2f}')
         else:
             self.Motor_data_text.clear()
     
     def thruster_checked(self, state):
         if state == Qt.Checked:
             self.thruster_status = True
+            self.node.thruster_status = True
         else:
             self.thruster_status = False
+            self.node.thruster_status = False
 
     def sensor_checked(self, state):
         if state == Qt.Checked:
             self.sensor_status = True
+            self.node.sensor_status = True
         else:
             self.sensor_status = False
+            self.node.sensor_status = False
 
     def motor_checked(self, state):
         if state == Qt.Checked:
             self.motor_status = True
+            self.node.motor_status = True
         else:
             self.motor_status = False
-
-
+            self.node.motor_status = False
 
     def data_reset(self):
         # self.saving = True
@@ -257,20 +261,25 @@ class DataSaveApp(QMainWindow):
     def data_save(self):
         self.Save_status_text.setText("Data save start")
         # self.file_name = self.file_name_input.text()
-        self.file_name = str('{0}_{1}'.format(int(self.pwm), int(self.file_name_input.text())))
+        self.file_name = str('{0}_{1}'.format(int(self.thruster_signal), int(self.file_name_input.text())))
         if self.file_name:
             try:
-                # PWM, Force, Torque 데이터 프레임 생성
-                df_pwm = pd.DataFrame(self.node.data_sheet_pwm, columns=['Time', 'PWM'])
+                # thruster_signal, Force, Torque 데이터 프레임 생성
+                df_thruster_signal = pd.DataFrame(self.node.data_sheet_thruster_signal, columns=['Time', 'Thruster_signal'])
+                df_thruster_signal.to_excel(f'{self.file_name}_thruster_signal.xlsx', index=False)
                 df_force = pd.DataFrame(self.node.data_sheet_force, columns=['Time', 'Force_X', 'Force_Y', 'Force_Z'])
-                df_torque = pd.DataFrame(self.node.data_sheet_torque, columns=['Time', 'Torque_X', 'Torque_Y', 'Torque_Z'])
-                
-
-                df_pwm.to_excel(f'{self.file_name}_pwm.xlsx', index=False)
                 df_force.to_excel(f'{self.file_name}_force.xlsx', index=False)
+                df_torque = pd.DataFrame(self.node.data_sheet_torque, columns=['Time', 'Torque_X', 'Torque_Y', 'Torque_Z'])
                 df_torque.to_excel(f'{self.file_name}_torque.xlsx', index=False)
+                df_torque = pd.DataFrame(self.node.data_sheet_motor, columns=['Time', 'Voltage', 'Angle', 'Velocity'])
+                df_torque.to_excel(f'{self.file_name}_torque.xlsx', index=False)
+                
+                
+                # df_thruster_signal.to_excel(f'{self.file_name}_thruster_signal.xlsx', index=False)
+                # df_force.to_excel(f'{self.file_name}_force.xlsx', index=False)
+                # df_torque.to_excel(f'{self.file_name}_torque.xlsx', index=False)
                 # 세 데이터 프레임을 시간 열을 기준으로 합치기
-                # df_merged = pd.merge(pd.merge(df_pwm, df_force, on='Time', how='outer'), df_torque, on='Time', how='outer')
+                # df_merged = pd.merge(pd.merge(df_thruster_signal, df_force, on='Time', how='outer'), df_torque, on='Time', how='outer')
                 
                 # 누락된 데이터가 있는 행 제거
                 # df_cleaned = df_merged.dropna()
@@ -287,7 +296,7 @@ class DataSaveApp(QMainWindow):
             self.Save_status_text.setText("Data save failed")
 
         # 데이터 시트 초기화
-        self.node.data_sheet_pwm.clear()
+        self.node.data_sheet_thruster_signal.clear()
         self.node.data_sheet_force.clear()
         self.node.data_sheet_torque.clear()
         self.node.data_sheet_motor.clear()
@@ -299,8 +308,8 @@ class DataSaveApp(QMainWindow):
             self.data_load()
             self.node.get_logger().info('2')
             time.sleep(0.1)
-            self.node.pwm = float(i)
-            self.pwm = float(i)
+            self.node.thruster_signal = float(i)
+            self.thruster_signal = float(i)
             self.node.get_logger().info('3')
             time.sleep(7)
             self.data_stop()
@@ -309,7 +318,7 @@ class DataSaveApp(QMainWindow):
             self.data_save()
             self.node.get_logger().info('6')
             time.sleep(3)
-            self.node.pwm = float(50)
+            self.node.thruster_signal = float(50)
             self.node.get_logger().info('7')
             time.sleep(3)
 

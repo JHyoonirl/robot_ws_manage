@@ -17,10 +17,10 @@ def generate_launch_description():
             description='USB port for FT sensor'
             )
     
-    sensor_data = Node(
+    sensor_operator = Node(
             package='manage_hardware',
-            executable='sensor_data',
-            name='sensor_data',
+            executable='sensor_operator',
+            name='sensor_operator',
             output='screen',
             parameters=[{
                 'usb_port': LaunchConfiguration('usb_port_sensor')
@@ -33,18 +33,18 @@ def generate_launch_description():
             name='data_save',
             output='screen')
 
-    pwm_ve = Node(
+    thruster_operator = Node(
             package='manage_hardware',
-            executable='pwm_ve',
-            name='pwm_ve',
+            executable='thruster_operator',
+            name='thruster_operator',
             output='screen')
 
 
 
     return LaunchDescription([
         usb_port_sensor,
-        sensor_data,
+        sensor_operator,
         data_save,
-        pwm_ve
+        thruster_operator
         
     ])

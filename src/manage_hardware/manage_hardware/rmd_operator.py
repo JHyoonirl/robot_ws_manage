@@ -4,7 +4,7 @@ from PyQt5 import uic
 from pyqtgraph import PlotWidget  # 그래프를 위한 라이브러리
 import sys
 import rclpy
-from std_msgs.msg import Float64
+from std_msgs.msg import Float64, Float64MultiArray
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
 # print(sys.path)
@@ -47,8 +47,8 @@ class Motor(Node):
 
         self.motor_contol_thread = threading.Thread(target=self.controller, daemon=True)
 
-        self.Motor_angle_publisher = self.create_publisher(Float64, 'Motor_angle', self.qos_profile)
-        self.Motor_velocity_publisher = self.create_publisher(Float64, 'Motor_velocity', self.qos_profile)
+        self.Motor_info_publisher = self.create_publisher(Float64MultiArray, 'Motor_info', self.qos_profile)
+        # self.Motor_velocity_publisher = self.create_publisher(Float64, 'Motor_velocity', self.qos_profile)
         
         ## 모터 반시계 회전(-)은 Extension
         ## 모터 시계 회전(+)은 flexion
@@ -62,17 +62,19 @@ class Motor(Node):
         self.sinusoidal_control_check_status = False # 작동 Main Switch
         self.position_control_activate_status = False # step 작동 on/off Switch
         self.sinusoidal_control_activate_status = False # step 작동 on/off Switch
-        self.neutral_angle = 0
+        # self.neutral_angle = 0
         self.neutral_torque = 0 # 중립 위치에서 발생하는 토크는?
         self.position_error = 0
 
-        with open("RMD/PID.json", "r") as fr:
+        with open("RMD/motor_info.json", "r") as fr:
             data = json.load(fr)
         # print(data)
 
         self.Kp = float(data["kp"])
         self.Ki = float(data["ki"])
         self.Kd = float(data["kd"])
+        self.Neutral_angle = float(data["neutral_angle"]) # 무릎의 0도에 해당하는 motor encoder의 각도
+        self.knee_angle = 0 # 무릎 각도 = encoder angle - self.Neutral_angle
 
         self.pos_error = 0
         self.pos_error_prev = 0
@@ -137,6 +139,10 @@ class Motor(Node):
             # print(self.control_check_status)
             try:
                 self.voltage, self.temperature, self.torque_current, self.velocity, self.angle = self.RMD.status_motor() #
+                self.knee_angle = self.angle - self.Neutral_angle # encoder angle - neutral angle
+                self.motor_info = Float64MultiArray()
+                self.motor_info.data = [self.voltage, self.knee_angle, self.velocity]
+                self.Motor_info_publisher.publish(self.motor_info)
                 time.sleep(0.001)
             except Exception as e:
                 print(f'Error1: {e}')
@@ -165,7 +171,7 @@ class Motor(Node):
         try:
             # _ = self.RMD.position_closed_loop(self.Desired_pos, self.VELOCITY_LIMIT)
             # print('control')
-            self.pos_error = self.Desired_angle - self.angle
+            self.pos_error = self.Desired_angle - self.knee_angle
 
             # Proportional term
             proportional = self.Kp * self.pos_error
@@ -193,7 +199,7 @@ class Motor(Node):
             sine_time = time.time() - self.RMD_timer
             self.Desired_angle = self.amplitude * math.sin(self.period * sine_time) + self.pos_offset
 
-            self.pos_error = self.Desired_angle - self.angle
+            self.pos_error = self.Desired_angle - self.knee_angle
             print(self.pos_error)
 
             # Proportional term
@@ -285,6 +291,7 @@ class MotorWindow(QMainWindow):
         self.Kp = self.findChild(QTextEdit, 'Pos_kp')
         self.Ki = self.findChild(QTextEdit, 'Pos_ki')
         self.Kd = self.findChild(QTextEdit, 'Pos_kd')
+        self.Neutral_angle = self.findChild(QTextEdit, 'Neutral_angle')
         # self.vel_ki = self.findChild(QTextEdit, 'vel_ki')
         # self.cur_kp = self.findChild(QTextEdit, 'cur_kp')
         # self.cur_ki = self.findChild(QTextEdit, 'cur_ki')
@@ -292,6 +299,7 @@ class MotorWindow(QMainWindow):
         self.Kp.setPlainText(f"{self._RMD.Kp}")
         self.Ki.setPlainText(f"{self._RMD.Ki}")
         self.Kd.setPlainText(f"{self._RMD.Kd}")
+        self.Neutral_angle.setPlainText(f"{self._RMD.Neutral_angle}")
         # self.vel_ki.setPlainText(f"{self._RMD.ki_vel}")
         # self.cur_kp.setPlainText(f"{self._RMD.kp_cur}")
         # self.cur_ki.setPlainText(f"{self._RMD.ki_cur}")
@@ -339,6 +347,8 @@ class MotorWindow(QMainWindow):
                 Kp = self.Kp.toPlainText()
                 Ki = self.Ki.toPlainText()
                 Kd = self.Kd.toPlainText()
+                neutral_angle = self.Neutral_angle.toPlainText()
+            
                 # ki_vel = self.vel_ki.toPlainText()
                 # kp_cur = self.cur_kp.toPlainText()
                 # ki_cur = self.cur_ki.toPlainText()
@@ -346,9 +356,10 @@ class MotorWindow(QMainWindow):
                 self._RMD.Kp = float(Kp)
                 self._RMD.Ki = float(Ki)
                 self._RMD.Kd = float(Kd)
+                self._RMD.Neutral_angle = float(neutral_angle)
 
-                data = {"kp": self._RMD.Kp, "ki": self._RMD.Ki, "kd": self._RMD.Kd}
-                with open("RMD/PID.json", "w") as fr:
+                data = {"kp": self._RMD.Kp, "ki": self._RMD.Ki, "kd": self._RMD.Kd, "neutral_angle": self._RMD.Neutral_angle}
+                with open("RMD/motor_info.json", "w") as fr:
                     json.dump(data, fr)
                 # print(data)
                 # self._RMD.ki_vel = int(ki_vel)
@@ -490,12 +501,12 @@ class MotorWindow(QMainWindow):
             self.sinusoidal_control_check_status = False
 
     def update_data(self):
-        
-        Current_angle = self._RMD.angle
+        Motor_angle = self._RMD.angle
+        Current_angle = self._RMD.knee_angle
         Desired_angle = self._RMD.Desired_angle
 
         velocity = self._RMD.velocity
-        self.Angle_text.setText(f"{Current_angle:.2f}")
+        self.Angle_text.setText(f"{Motor_angle:.2f}")
         
         # for i, label in enumerate(self.torque_labels):
         self.Velocity_text.setText(f"{velocity:.2f}")
