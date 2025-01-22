@@ -6,8 +6,8 @@ from std_msgs.msg import Float64
 from rclpy.qos import QoSProfile, QoSHistoryPolicy, QoSReliabilityPolicy
 from geometry_msgs.msg import Vector3
 from std_msgs.msg import Bool, Float64MultiArray
-from PyQt5.QtWidgets import QApplication, QVBoxLayout, QWidget, QLabel, QLineEdit, QGroupBox, QPushButton, QHBoxLayout, QMainWindow, QCheckBox, QTextBrowser
-from PyQt5.QtCore import QTimer, QDateTime, Qt
+from PyQt5.QtWidgets import QApplication, QVBoxLayout, QWidget, QLabel, QLineEdit, QGroupBox, QPushButton, QHBoxLayout, QMainWindow, QCheckBox, QTextBrowser, QTextEdit
+from PyQt5.QtCore import QTimer, QDateTime, Qt, QThread
 from threading import Thread, Lock
 from collections import deque
 import datetime
@@ -52,7 +52,7 @@ class DataSaver(Node):
         self.motor_ = ()
 
         
-        # self.Thruster_publisher = self.create_publisher(Float64, 'Thruster_signal', self.qos_profile) # 실험을 위해 주석 처리
+        self.Thruster_publisher = self.create_publisher(Float64, 'Thruster_signal', self.qos_profile) # 실험을 위해 주석 처리
         
         self.thruster_sub = self.create_subscription(
             Float64,
@@ -121,9 +121,6 @@ class DataSaver(Node):
         if self.saving_status and self.sensor_status == True:
             dt_object = datetime.datetime.fromtimestamp(self.torque_timestamp)
             formatted_time = dt_object.strftime('%H:%M:%S.%f')[:-3]
-            
-            # 시간, 분, 초, 밀리세컨드를 포함하는 문자열 형식으로 반환합니다.
-            # formatted_time = now.strftime("%H:%M:%S.%f")[:-3]  # .%f는 마이크로세컨드까지 포함하므로, 마지막 3자리를 잘라 밀리세컨드로 사용
 
             data_entry = [formatted_time, self.torque_x, self.torque_y, self.torque_z]
             self.data_sheet_torque.append(data_entry)
@@ -136,9 +133,6 @@ class DataSaver(Node):
         if self.saving_status and self.motor_status == True:
             dt_object = datetime.datetime.fromtimestamp(self.motor_timestamp)
             formatted_time = dt_object.strftime('%H:%M:%S.%f')[:-3]
-            
-            # 시간, 분, 초, 밀리세컨드를 포함하는 문자열 형식으로 반환합니다.
-            # formatted_time = now.strftime("%H:%M:%S.%f")[:-3]  # .%f는 마이크로세컨드까지 포함하므로, 마지막 3자리를 잘라 밀리세컨드로 사용
 
             data_entry = [formatted_time, self.votage, self.angle, self.velocity]
             self.data_sheet_motor.append(data_entry)
@@ -157,6 +151,8 @@ class DataSaveApp(QMainWindow):
         self.thruster_status = 0
         self.sensor_status = 0
         self.motor_status = 0
+        
+        self.show()
 
     def init_ui(self):
         # QTimer to periodically update the data
@@ -186,16 +182,19 @@ class DataSaveApp(QMainWindow):
         self.data_stop_btn = self.findChild(QPushButton, 'data_stop')
         self.data_save_btn = self.findChild(QPushButton, 'data_save')
 
-        self.data_reset_btn.clicked.connect(self.data_reset)
-        self.data_load_btn.clicked.connect(self.data_load)
-        self.data_stop_btn.clicked.connect(self.data_stop)
-        self.data_save_btn.clicked.connect(self.data_save)
+        self.data_reset_btn.clicked.connect(self.data_reset_fcn)
+        self.data_load_btn.clicked.connect(self.data_load_fcn)
+        self.data_stop_btn.clicked.connect(self.data_stop_fcn)
+        self.data_save_btn.clicked.connect(self.data_save_fcn)
 
         # text browsers
-        self.Thruster_data_text = self.findChild(QTextBrowser, 'thruster_check')
-        self.Sensor_data_text = self.findChild(QTextBrowser, 'sensor_check')
-        self.Motor_data_text = self.findChild(QTextBrowser, 'motor_check')
+        self.Thruster_data_text = self.findChild(QTextBrowser, 'thruster_data')
+        self.Sensor_data_text = self.findChild(QTextBrowser, 'sensor_data')
+        self.Motor_data_text = self.findChild(QTextBrowser, 'motor_data')
         self.Save_status_text = self.findChild(QTextBrowser, 'save_status')
+
+        # text edit
+        self.file_name_text = self.findChild(QTextEdit, 'file_name')
 
 
     def update_data(self):
@@ -241,38 +240,42 @@ class DataSaveApp(QMainWindow):
             self.motor_status = False
             self.node.motor_status = False
 
-    def data_reset(self):
+    def data_reset_fcn(self):
         # self.saving = True
         self.node.data_sheet = deque()
         self.Save_status_text.setText("data_reset")
     
-    def data_load(self):
+    def data_load_fcn(self):
         self.node.saving_status = True
         self.Save_status_text.setText("data_load")
         self.data_reset_btn.setEnabled(False)
         self.data_save_btn.setEnabled(False)
 
-    def data_stop(self):
+    def data_stop_fcn(self):
         self.node.saving_status  = False
         self.Save_status_text.setText("data_stop")
         self.data_reset_btn.setEnabled(True)
         self.data_save_btn.setEnabled(True)
     
-    def data_save(self):
+    def data_save_fcn(self):
         self.Save_status_text.setText("Data save start")
-        # self.file_name = self.file_name_input.text()
-        self.file_name = str('{0}_{1}'.format(int(self.thruster_signal), int(self.file_name_input.text())))
+        self.file_name = self.file_name_text.toPlainText()
+        # self.file_name = str('{0}_{1}'.format(int(self.thruster_signal), int(self.file_name_input.text())))
         if self.file_name:
             try:
                 # thruster_signal, Force, Torque 데이터 프레임 생성
-                df_thruster_signal = pd.DataFrame(self.node.data_sheet_thruster_signal, columns=['Time', 'Thruster_signal'])
-                df_thruster_signal.to_excel(f'{self.file_name}_thruster_signal.xlsx', index=False)
-                df_force = pd.DataFrame(self.node.data_sheet_force, columns=['Time', 'Force_X', 'Force_Y', 'Force_Z'])
-                df_force.to_excel(f'{self.file_name}_force.xlsx', index=False)
-                df_torque = pd.DataFrame(self.node.data_sheet_torque, columns=['Time', 'Torque_X', 'Torque_Y', 'Torque_Z'])
-                df_torque.to_excel(f'{self.file_name}_torque.xlsx', index=False)
-                df_torque = pd.DataFrame(self.node.data_sheet_motor, columns=['Time', 'Voltage', 'Angle', 'Velocity'])
-                df_torque.to_excel(f'{self.file_name}_torque.xlsx', index=False)
+                if self.thruster_status == True:
+                    df_thruster_signal = pd.DataFrame(self.node.data_sheet_thruster_signal, columns=['Time', 'Thruster_signal'])
+                    df_thruster_signal.to_excel(f'{self.file_name}_thruster_signal.xlsx', index=False)
+                if self.sensor_status == True:
+
+                    df_force = pd.DataFrame(self.node.data_sheet_force, columns=['Time', 'Force_X', 'Force_Y', 'Force_Z'])
+                    df_force.to_excel(f'{self.file_name}_force.xlsx', index=False)
+                    df_torque = pd.DataFrame(self.node.data_sheet_torque, columns=['Time', 'Torque_X', 'Torque_Y', 'Torque_Z'])
+                    df_torque.to_excel(f'{self.file_name}_torque.xlsx', index=False)
+                if self.motor_status == True:
+                    df_motor = pd.DataFrame(self.node.data_sheet_motor, columns=['Time', 'Voltage', 'Angle', 'Velocity'])
+                    df_motor.to_excel(f'{self.file_name}_motor.xlsx', index=False)
                 
                 
                 # df_thruster_signal.to_excel(f'{self.file_name}_thruster_signal.xlsx', index=False)
@@ -286,7 +289,7 @@ class DataSaveApp(QMainWindow):
 
                 # Excel 파일로 저장
                 # df_merged.to_excel(f'{self.file_name}.xlsx', index=False)
-                print(f'Data saved to {self.file_name}.xlsx')
+                print(f'Data saved to {self.file_name}')
                 self.Save_status_text.setText("Data save complete")
             except Exception as e:
                 print(f"Error saving data: {e}")
@@ -300,6 +303,7 @@ class DataSaveApp(QMainWindow):
         self.node.data_sheet_force.clear()
         self.node.data_sheet_torque.clear()
         self.node.data_sheet_motor.clear()
+        
     def button_auto_saver(self):
         for i in range(0, 101, 5):
             self.data_reset()
@@ -349,8 +353,9 @@ def main(args=None):
             node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()
-        if node_thread.is_alive():
-            node_thread.join()
+        if node_thread.isRunning():
+            node_thread.quit()
+            node_thread.wait()
         print("Cleanup complete.")
 
 if __name__ == '__main__':
