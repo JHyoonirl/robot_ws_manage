@@ -2,6 +2,10 @@ import numpy as np
 
 class Muscle:
     def __init__(self):
+        '''
+        설멍:
+        muscle의 passive component를 적용하기 위해서 
+        '''
         self.angle = 0
         self.velocity = 0
         self.neutral_torque = 0
