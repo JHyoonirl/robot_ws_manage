@@ -4,12 +4,26 @@ class Muscle:
     def __init__(self):
         '''
         설멍:
-        muscle의 passive component를 적용하기 위해서 
+        muscle의 passive component를 적용하기 위한 객체와 Muscle의 Active force를 적용하기 위한 객체
+        + 현재 무릎 모사 장치의 중성 부력 상태가 아니기 때문에 중력 보상 필요
         '''
         self.angle = 0
+        '''
+        현재 무릎의 각도 UNIT[deg]
+        '''
         self.velocity = 0
-        self.neutral_torque = 0
-        pass
+        '''
+        현재 무릎의 각속도 UNIT[deg/s]
+        '''
+        self.neutral_force = 0
+        '''
+        중력 보상을 위한 토크값 --> force scalar가 되어야 할 수도?(수학적 증명 필요)
+        '''
+        self.Control_mode = False
+        '''
+        False: Only for involuntary / True: Control with voluntary
+        '''
+
 
     def M_stiffness(self):
         '''
@@ -23,6 +37,7 @@ class Muscle:
             torque = -0.002*np.exp(0.0768*self.angle)
         else:
             torque = 0
+            
         return torque
 
     def M_damping(self):
