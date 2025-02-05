@@ -15,7 +15,7 @@ class Muscle:
         '''
         현재 무릎의 각속도 UNIT[deg/s]
         '''
-        self.neutral_force = 0
+        self.neutral_torque = 0
         '''
         중력 보상을 위한 토크값 --> force scalar가 되어야 할 수도?(수학적 증명 필요)
         '''

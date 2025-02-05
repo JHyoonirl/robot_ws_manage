@@ -244,6 +244,7 @@ class MotorWindow(QMainWindow):
         self.ui = uic.loadUi('UI/motor.ui', self)
 
         self.initUI()
+        # print("initialize rmd motor")
         # self.initTimer()
         self.show()
 

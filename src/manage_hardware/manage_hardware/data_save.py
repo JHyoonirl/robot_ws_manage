@@ -52,11 +52,11 @@ class DataSaver(Node):
         self.motor_ = ()
 
         
-        self.Thruster_publisher = self.create_publisher(Float64, 'Thruster_signal', self.qos_profile) # 실험을 위해 주석 처리
+        self.Thruster_publisher = self.create_publisher(Float64, 'thruster_signal', self.qos_profile) # 실험을 위해 주석 처리
         
         self.thruster_sub = self.create_subscription(
             Float64,
-            'Thruster_signal',
+            'thruster_signal',
             self.thruster_subscriber,
             self.qos_profile)
         
@@ -148,9 +148,9 @@ class DataSaveApp(QMainWindow):
         self.ui = uic.loadUi('UI/data_save.ui', self)
         self.init_ui()
 
-        self.thruster_status = 0
-        self.sensor_status = 0
-        self.motor_status = 0
+        self.thruster_status = True
+        self.sensor_status = True
+        self.motor_status = True
         
         self.show()
 
