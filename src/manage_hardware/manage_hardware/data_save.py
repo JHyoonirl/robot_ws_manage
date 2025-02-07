@@ -128,13 +128,13 @@ class DataSaver(Node):
 
     def motor_subscriber(self, msg):
         # with self.data_lock:
-        self.votage, self.angle, self.velocity = msg.data
+        self.voltage, self.torque_current, self.knee_angle, self.velocity = msg.data
         self.motor_timestamp = time.time()
         if self.saving_status and self.motor_status == True:
             dt_object = datetime.datetime.fromtimestamp(self.motor_timestamp)
             formatted_time = dt_object.strftime('%H:%M:%S.%f')[:-3]
 
-            data_entry = [formatted_time, self.votage, self.angle, self.velocity]
+            data_entry = [formatted_time, self.voltage, self.torque_current, self.knee_angle, self.velocity]
             self.data_sheet_motor.append(data_entry)
             # self.last_force_save_time = time.time()
 
@@ -274,7 +274,7 @@ class DataSaveApp(QMainWindow):
                     df_torque = pd.DataFrame(self.node.data_sheet_torque, columns=['Time', 'Torque_X', 'Torque_Y', 'Torque_Z'])
                     df_torque.to_excel(f'{self.file_name}_torque.xlsx', index=False)
                 if self.motor_status == True:
-                    df_motor = pd.DataFrame(self.node.data_sheet_motor, columns=['Time', 'Voltage', 'Angle', 'Velocity'])
+                    df_motor = pd.DataFrame(self.node.data_sheet_motor, columns=['Time', 'voltage', 'torque_current', 'angle', 'velocity'])
                     df_motor.to_excel(f'{self.file_name}_motor.xlsx', index=False)
                 
                 

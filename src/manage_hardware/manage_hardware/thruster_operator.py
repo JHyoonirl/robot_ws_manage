@@ -73,6 +73,8 @@ class thrusterApp(QMainWindow, form_class):
         super().__init__()
         self.node = node
         self.setupUi(self)
+        self.percentage = 50
+        self.torque = 0
         self.init_ui()
         
     def init_ui(self):
@@ -97,6 +99,8 @@ class thrusterApp(QMainWindow, form_class):
         
         self.button_on.clicked.connect(lambda: self.node.send_request(True))
         self.button_off.clicked.connect(lambda: self.node.send_request(False))
+        self.percentage_btn.clicked.connect(self.percentage_changed)
+        self.torque_btn.clicked.connect(self.torque_changed)
         
         self.show()
         QApplication.processEvents()
@@ -121,11 +125,17 @@ class thrusterApp(QMainWindow, form_class):
                 # print(self._RMD.position_control_check_status, self._RMD.sinusoidal_control_check_status)
         
     def thruster_percentage_changed(self, value):
-        self.node.thruster = float(value)
+        self.percentage = float(value)
 
     def thruster_torque_changed(self, value):
-        self.node.torque = float(value)
-        # self.node.get_logger().info(f'thruster value set to {value}')
+        self.torque = float(value)
+
+    def percentage_changed(self):
+        self.node.thruster = float(self.percentage)
+
+    def torque_changed(self):
+        self.node.torque = float(self.torque)
+        
 
     
 def run_node(node):

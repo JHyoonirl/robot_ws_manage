@@ -80,6 +80,7 @@ class Motor(Node):
         self.pos_error_prev = 0
         self.pos_error_integral = 0
         self.dt = 0.005
+        self.past_time = time.time()
 
         self.amplitude = 0.0
         self.period = 0.0
@@ -92,6 +93,9 @@ class Motor(Node):
         self.velocity = 0
         self.angle = 0
 
+        self.torque_threshold = 650
+
+        self.torque_out = 0
         status_1 = self.init_motor()
         status_2 = self.init_acceleration()
         if status_1 == True and status_2 == True:
@@ -107,8 +111,10 @@ class Motor(Node):
         self.ki_vel = data[5]
         self.kp_pos = data[6]
         self.ki_pos = data[7]
-        # print(self.kp_cur, self.ki_cur)
-        
+
+        print(self.kp_cur, self.ki_cur)
+        print(self.kp_vel, self.ki_vel)
+        print(self.kp_pos, self.ki_pos)
         data = [
             self.RMD.byteArray(self.kp_cur, 1) ,
             self.RMD.byteArray(self.ki_cur, 1),
@@ -138,27 +144,33 @@ class Motor(Node):
         while True:
             # print(self.control_check_status)
             try:
-                self.voltage, self.temperature, self.torque_current, self.velocity, self.angle = self.RMD.status_motor() #
+                self.voltage, self.temperature, self.torque_current, self.velocity, self.angle, error = self.RMD.status_motor() #
+                # print(error)
                 self.knee_angle = self.angle - self.Neutral_angle # encoder angle - neutral angle
                 self.motor_info = Float64MultiArray()
-                self.motor_info.data = [self.voltage, self.knee_angle, self.velocity]
+                self.motor_info.data = [self.voltage, self.torque_current, self.knee_angle, self.velocity]
                 self.Motor_info_publisher.publish(self.motor_info)
-                time.sleep(0.001)
+                # self.motor_info.data = float(self.knee_angle)
+                # self.Motor_info_publisher.publish(self.motor_info)
+                # time.sleep(0.001)
             except Exception as e:
                 print(f'Error1: {e}')
             if self.control_check_status == False:
                 self.motor_off()
-                
-            if self.position_control_check_status == True and self.position_control_activate_status == True: # step 제어 가능
-                # if self.position_control_activate_status == True: #제어 활성화
-                self.motor_step()
-            elif self.sinusoidal_control_check_status == True and self.sinusoidal_control_activate_status == True: # sine 제어 가능
-                self.motor_sine()
-            else:
-                # if self.sinusoidal_control_activate_status == True:
-                self.motor_off()
+            else:  
+                if self.position_control_check_status == True and self.position_control_activate_status == True: # step 제어 가능
+                    # if self.position_control_activate_status == True: #제어 활성화
+                    self.motor_step()
+                elif self.sinusoidal_control_check_status == True and self.sinusoidal_control_activate_status == True: # sine 제어 가능
+                    self.motor_sine()
+                else:
+                    self.motor_off()
 
-            time.sleep(self.dt)
+            
+            # print(time.time() - self.past_time)
+            self.past_time = time.time()
+
+            # time.sleep(self.dt)
 
 
     def motor_off(self):
@@ -170,7 +182,7 @@ class Motor(Node):
     def motor_step(self):
         try:
             # _ = self.RMD.position_closed_loop(self.Desired_pos, self.VELOCITY_LIMIT)
-            # print('control')
+            self.dt = time.time() - self.past_time
             self.pos_error = self.Desired_angle - self.knee_angle
 
             # Proportional term
@@ -189,13 +201,21 @@ class Motor(Node):
             # Calculate the control output
             output = proportional + integral + derivative
 
-            _ = self.RMD.torque_closed_loop(int(output))
+            if abs(output) > self.torque_threshold:
+                if output > 0:
+                    output = self.torque_threshold
+                elif output < 0:
+                    output = - self.torque_threshold
+
+            temperature, torque, speed, angle = self.RMD.torque_closed_loop(int(output))
+            self.get_logger().info('rmd torque, speed, angle: {0}'.format(torque, speed, angle))
 
         except Exception as e:
             print(f'Error2: {e}')
 
     def motor_sine(self):
         try:
+            self.dt = time.time() - self.past_time
             sine_time = time.time() - self.RMD_timer
             self.Desired_angle = self.amplitude * math.sin(self.period * sine_time) + self.pos_offset
 
@@ -217,8 +237,14 @@ class Motor(Node):
 
             # Calculate the control output
             output = proportional + integral + derivative
-
-            _ = self.RMD.torque_closed_loop(int(output))
+            if abs(output) > self.torque_threshold:
+                if output > 0:
+                    output = self.torque_threshold
+                elif output < 0:
+                    output = - self.torque_threshold
+ 
+            temperature, torque, speed, angle = self.RMD.torque_closed_loop(int(output))
+            self.get_logger().info('rmd torque, speed, angle: {0}'.format(torque, speed, angle))
                         
 
         except Exception as e:
@@ -353,7 +379,7 @@ class MotorWindow(QMainWindow):
                 # ki_vel = self.vel_ki.toPlainText()
                 # kp_cur = self.cur_kp.toPlainText()
                 # ki_cur = self.cur_ki.toPlainText()
-                time.sleep(0.005)
+                time.sleep(0.001)
                 self._RMD.Kp = float(Kp)
                 self._RMD.Ki = float(Ki)
                 self._RMD.Kd = float(Kd)
@@ -523,7 +549,7 @@ class MotorWindow(QMainWindow):
             self.Current_Angle_list.pop(0)
         self.Desired_Angle_list.append(Desired_angle)
         self.Current_Angle_list.append(Current_angle)
-        self.Speed_list.append(velocity* 360 / 60)
+        self.Speed_list.append(velocity)
         self.Plot_Angle_desired_data.setData(self.Desired_Angle_list)
         self.Plot_Angle_current_data.setData(self.Current_Angle_list)
         self.Plot_Velocity_data.setData(self.Speed_list)
