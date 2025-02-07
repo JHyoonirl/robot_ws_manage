@@ -16,6 +16,7 @@ from custominterface.srv import Status
 from builtin_interfaces.msg import Time
 from pyqtgraph import PlotWidget
 import sys
+import signal
 
 
 class Sensor(Node):
@@ -169,7 +170,7 @@ class SensorApp(QMainWindow):
         ### 타이머 설정 ###
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_data)
-        self.timer.start(5)  # 100ms 간격으로 업데이트
+        # self.timer.start(5)  # 100ms 간격으로 업데이트
         
         # 버튼 위젯 찾기
         self.btn_bias = self.findChild(QPushButton, 'Setbias')
@@ -254,6 +255,12 @@ def run_node(node):
     rclpy.spin(node)
 
 def main(args=None):
+    def signal_handler(sig, frame):
+        print("Shutting down...")
+        QApplication.quit()  # QApplication을 종료합니다.
+
+    signal.signal(signal.SIGINT, signal_handler)  # SIGINT 신호를 처리하기 위해 핸들러를 등록합니다.
+    
     rclpy.init(args=args)
     sensor = Sensor()
     thread = Thread(target=run_node, args=(sensor,), daemon=True)

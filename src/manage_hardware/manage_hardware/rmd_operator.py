@@ -23,6 +23,7 @@ import math
 import traceback
 import json
 from Muscle import Muscle
+import signal
 
 
 
@@ -79,7 +80,7 @@ class Motor(Node):
         self.pos_error = 0
         self.pos_error_prev = 0
         self.pos_error_integral = 0
-        self.dt = 0.005
+        self.dt_sleep = 0.001
         self.past_time = time.time()
 
         self.amplitude = 0.0
@@ -170,7 +171,7 @@ class Motor(Node):
             # print(time.time() - self.past_time)
             self.past_time = time.time()
 
-            # time.sleep(self.dt)
+            time.sleep(self.dt_sleep)
 
 
     def motor_off(self):
@@ -208,7 +209,7 @@ class Motor(Node):
                     output = - self.torque_threshold
 
             temperature, torque, speed, angle = self.RMD.torque_closed_loop(int(output))
-            self.get_logger().info('rmd torque, speed, angle: {0}'.format(torque, speed, angle))
+            # self.get_logger().info('rmd torque, speed, angle: {0}'.format(torque, speed, angle))
 
         except Exception as e:
             print(f'Error2: {e}')
@@ -244,7 +245,7 @@ class Motor(Node):
                     output = - self.torque_threshold
  
             temperature, torque, speed, angle = self.RMD.torque_closed_loop(int(output))
-            self.get_logger().info('rmd torque, speed, angle: {0}'.format(torque, speed, angle))
+            # self.get_logger().info('rmd torque, speed, angle: {0}'.format(torque, speed, angle))
                         
 
         except Exception as e:
@@ -299,7 +300,7 @@ class MotorWindow(QMainWindow):
         ### 타이머 설정 ###
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_data)
-        self.timer.start(10)  # 100ms 간격으로 업데이트
+        # self.timer.start(10)  # 100ms 간격으로 업데이트
         
         # 체크 박스 정의
         self.control_on_off = self.findChild(QCheckBox, 'Control_on_off_check')
@@ -559,16 +560,36 @@ def run_node(node):
 
 
 def main(args=None):
+    # rclpy.init(args=args)
+    # motor = Motor()
+    # thread = threading.Thread(target=run_node, args=(motor, ), daemon=True)
+    # # motor_thread = threading.Thread(target=motor.controller, daemon=True)
+    # thread.start()
+    # time.sleep(0.5)
+    # app = QApplication(sys.argv)
+    # main_window = MotorWindow(motor)
+    # # main_window.show()
+    # sys.exit(app.exec_())
+
+
+
+
+    def signal_handler(sig, frame):
+        print("Shutting down...")
+        QApplication.quit()  # QApplication을 종료합니다.
+
+    signal.signal(signal.SIGINT, signal_handler)  # SIGINT 신호를 처리하기 위해 핸들러를 등록합니다.
+    
     rclpy.init(args=args)
     motor = Motor()
     thread = threading.Thread(target=run_node, args=(motor, ), daemon=True)
-    # motor_thread = threading.Thread(target=motor.controller, daemon=True)
     thread.start()
     time.sleep(0.5)
+    
     app = QApplication(sys.argv)
     main_window = MotorWindow(motor)
-    # main_window.show()
     sys.exit(app.exec_())
+
 
 if __name__ == '__main__':
     main()

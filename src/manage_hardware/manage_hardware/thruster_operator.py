@@ -10,6 +10,7 @@ from threading import Thread
 from datetime import datetime
 from PyQt5 import uic
 from thruster_torque_converter import thruster_converter
+import signal
 
 form_class = uic.loadUiType("UI/thruster.ui")[0]
 
@@ -142,6 +143,13 @@ def run_node(node):
     rclpy.spin(node)
 
 def main(args=None):
+    def signal_handler(sig, frame):
+        print("Shutting down...")
+        QApplication.quit()  # QApplication을 종료합니다.
+
+    signal.signal(signal.SIGINT, signal_handler)  # SIGINT 신호를 처리하기 위해 핸들러를 등록합니다.
+    
+    
     rclpy.init(args=args)
     node = thrusterClient()
     node_thread = Thread(target=run_node, args=(node,))
@@ -150,7 +158,7 @@ def main(args=None):
     app = QApplication(sys.argv)
     ex = thrusterApp(node)
     node_thread.start()
-    app.exec_()
+    sys.exit(app.exec_())
     
     node.destroy_node()
     rclpy.shutdown()
