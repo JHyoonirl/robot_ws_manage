@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>798</width>
-    <height>794</height>
+    <width>1153</width>
+    <height>823</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -17,8 +17,8 @@
    <widget class="PlotWidget" name="Plot_Angle" native="true">
     <property name="geometry">
      <rect>
-      <x>20</x>
-      <y>60</y>
+      <x>170</x>
+      <y>80</y>
       <width>361</width>
       <height>221</height>
      </rect>
@@ -27,8 +27,8 @@
    <widget class="PlotWidget" name="Plot_Velocity" native="true">
     <property name="geometry">
      <rect>
-      <x>410</x>
-      <y>60</y>
+      <x>560</x>
+      <y>80</y>
       <width>361</width>
       <height>221</height>
      </rect>
@@ -37,8 +37,8 @@
    <widget class="QLabel" name="pos_label">
     <property name="geometry">
      <rect>
-      <x>130</x>
-      <y>40</y>
+      <x>280</x>
+      <y>60</y>
       <width>151</width>
       <height>16</height>
      </rect>
@@ -53,8 +53,8 @@
    <widget class="QLabel" name="vel_label">
     <property name="geometry">
      <rect>
-      <x>520</x>
-      <y>40</y>
+      <x>670</x>
+      <y>60</y>
       <width>151</width>
       <height>16</height>
      </rect>
@@ -69,8 +69,8 @@
    <widget class="QTextBrowser" name="angle_data">
     <property name="geometry">
      <rect>
-      <x>260</x>
-      <y>290</y>
+      <x>410</x>
+      <y>310</y>
       <width>121</width>
       <height>31</height>
      </rect>
@@ -79,8 +79,8 @@
    <widget class="QTextBrowser" name="velocity_data">
     <property name="geometry">
      <rect>
-      <x>640</x>
-      <y>290</y>
+      <x>790</x>
+      <y>310</y>
       <width>131</width>
       <height>31</height>
      </rect>
@@ -89,8 +89,8 @@
    <widget class="QLabel" name="pos_data_label">
     <property name="geometry">
      <rect>
-      <x>180</x>
-      <y>300</y>
+      <x>330</x>
+      <y>320</y>
       <width>71</width>
       <height>20</height>
      </rect>
@@ -105,8 +105,8 @@
    <widget class="QLabel" name="vel_data_label">
     <property name="geometry">
      <rect>
-      <x>560</x>
-      <y>300</y>
+      <x>710</x>
+      <y>320</y>
       <width>71</width>
       <height>20</height>
      </rect>
@@ -121,7 +121,7 @@
    <widget class="QCheckBox" name="position_control_check">
     <property name="geometry">
      <rect>
-      <x>120</x>
+      <x>90</x>
       <y>440</y>
       <width>131</width>
       <height>16</height>
@@ -163,7 +163,7 @@
    <widget class="QCheckBox" name="Control_on_off_check">
     <property name="geometry">
      <rect>
-      <x>120</x>
+      <x>90</x>
       <y>410</y>
       <width>131</width>
       <height>16</height>
@@ -176,7 +176,7 @@
    <widget class="QCheckBox" name="sinusoidal_control_check">
     <property name="geometry">
      <rect>
-      <x>120</x>
+      <x>90</x>
       <y>470</y>
       <width>151</width>
       <height>16</height>
@@ -189,8 +189,8 @@
    <widget class="QLabel" name="position_control_parameter_label">
     <property name="geometry">
      <rect>
-      <x>120</x>
-      <y>510</y>
+      <x>90</x>
+      <y>540</y>
       <width>161</width>
       <height>20</height>
      </rect>
@@ -210,9 +210,9 @@
    <widget class="QTextEdit" name="Pos_kd">
     <property name="geometry">
      <rect>
-      <x>240</x>
-      <y>550</y>
-      <width>45</width>
+      <x>80</x>
+      <y>650</y>
+      <width>81</width>
       <height>31</height>
      </rect>
     </property>
@@ -220,8 +220,8 @@
    <widget class="QLabel" name="pos_label_5">
     <property name="geometry">
      <rect>
-      <x>400</x>
-      <y>410</y>
+      <x>430</x>
+      <y>430</y>
       <width>91</width>
       <height>20</height>
      </rect>
@@ -236,8 +236,8 @@
    <widget class="QTextEdit" name="desired_pos">
     <property name="geometry">
      <rect>
-      <x>500</x>
-      <y>400</y>
+      <x>530</x>
+      <y>420</y>
       <width>101</width>
       <height>31</height>
      </rect>
@@ -246,8 +246,8 @@
    <widget class="QTextEdit" name="amplitude">
     <property name="geometry">
      <rect>
-      <x>530</x>
-      <y>530</y>
+      <x>560</x>
+      <y>550</y>
       <width>101</width>
       <height>31</height>
      </rect>
@@ -256,8 +256,8 @@
    <widget class="QLabel" name="pos_label_7">
     <property name="geometry">
      <rect>
-      <x>450</x>
-      <y>590</y>
+      <x>480</x>
+      <y>610</y>
       <width>71</width>
       <height>20</height>
      </rect>
@@ -272,8 +272,8 @@
    <widget class="QLabel" name="label_3">
     <property name="geometry">
      <rect>
-      <x>390</x>
-      <y>500</y>
+      <x>420</x>
+      <y>520</y>
       <width>251</width>
       <height>20</height>
      </rect>
@@ -293,8 +293,8 @@
    <widget class="QTextEdit" name="pos_offset">
     <property name="geometry">
      <rect>
-      <x>530</x>
-      <y>630</y>
+      <x>560</x>
+      <y>650</y>
       <width>101</width>
       <height>31</height>
      </rect>
@@ -303,8 +303,8 @@
    <widget class="QTextEdit" name="period">
     <property name="geometry">
      <rect>
-      <x>530</x>
-      <y>580</y>
+      <x>560</x>
+      <y>600</y>
       <width>101</width>
       <height>31</height>
      </rect>
@@ -313,8 +313,8 @@
    <widget class="QLabel" name="pos_label_8">
     <property name="geometry">
      <rect>
-      <x>400</x>
-      <y>640</y>
+      <x>430</x>
+      <y>660</y>
       <width>121</width>
       <height>20</height>
      </rect>
@@ -329,8 +329,8 @@
    <widget class="QLabel" name="pos_label_9">
     <property name="geometry">
      <rect>
-      <x>450</x>
-      <y>540</y>
+      <x>480</x>
+      <y>560</y>
       <width>71</width>
       <height>20</height>
      </rect>
@@ -345,8 +345,8 @@
    <widget class="QPushButton" name="parameter_setting_btn">
     <property name="geometry">
      <rect>
-      <x>120</x>
-      <y>690</y>
+      <x>80</x>
+      <y>730</y>
       <width>91</width>
       <height>23</height>
      </rect>
@@ -358,8 +358,8 @@
    <widget class="QPushButton" name="sinusoidal_setting_btn">
     <property name="geometry">
      <rect>
-      <x>360</x>
-      <y>680</y>
+      <x>390</x>
+      <y>700</y>
       <width>81</width>
       <height>23</height>
      </rect>
@@ -371,8 +371,8 @@
    <widget class="QPushButton" name="pos_start_btn">
     <property name="geometry">
      <rect>
-      <x>450</x>
-      <y>450</y>
+      <x>480</x>
+      <y>470</y>
       <width>91</width>
       <height>23</height>
      </rect>
@@ -384,8 +384,8 @@
    <widget class="QPushButton" name="sinusoidal_start_btn">
     <property name="geometry">
      <rect>
-      <x>450</x>
-      <y>680</y>
+      <x>480</x>
+      <y>700</y>
       <width>91</width>
       <height>23</height>
      </rect>
@@ -397,8 +397,8 @@
    <widget class="QPushButton" name="pos_stop_btn">
     <property name="geometry">
      <rect>
-      <x>550</x>
-      <y>450</y>
+      <x>580</x>
+      <y>470</y>
       <width>91</width>
       <height>23</height>
      </rect>
@@ -410,8 +410,8 @@
    <widget class="QPushButton" name="sinusoidal_stop_btn">
     <property name="geometry">
      <rect>
-      <x>550</x>
-      <y>680</y>
+      <x>580</x>
+      <y>700</y>
       <width>91</width>
       <height>23</height>
      </rect>
@@ -423,9 +423,9 @@
    <widget class="QTextEdit" name="Pos_kp">
     <property name="geometry">
      <rect>
-      <x>120</x>
-      <y>550</y>
-      <width>45</width>
+      <x>84</x>
+      <y>580</y>
+      <width>81</width>
       <height>31</height>
      </rect>
     </property>
@@ -434,8 +434,8 @@
     <property name="geometry">
      <rect>
       <x>180</x>
-      <y>550</y>
-      <width>45</width>
+      <y>580</y>
+      <width>81</width>
       <height>31</height>
      </rect>
     </property>
@@ -443,7 +443,7 @@
    <widget class="QPushButton" name="system_quit_btn">
     <property name="geometry">
      <rect>
-      <x>670</x>
+      <x>1040</x>
       <y>10</y>
       <width>91</width>
       <height>23</height>
@@ -456,8 +456,8 @@
    <widget class="QLabel" name="pos_label_6">
     <property name="geometry">
      <rect>
-      <x>120</x>
-      <y>590</y>
+      <x>100</x>
+      <y>620</y>
       <width>41</width>
       <height>20</height>
      </rect>
@@ -472,8 +472,8 @@
    <widget class="QLabel" name="pos_label_10">
     <property name="geometry">
      <rect>
-      <x>180</x>
-      <y>590</y>
+      <x>200</x>
+      <y>620</y>
       <width>41</width>
       <height>20</height>
      </rect>
@@ -488,8 +488,8 @@
    <widget class="QLabel" name="pos_label_11">
     <property name="geometry">
      <rect>
-      <x>240</x>
-      <y>590</y>
+      <x>100</x>
+      <y>690</y>
       <width>41</width>
       <height>20</height>
      </rect>
@@ -504,8 +504,8 @@
    <widget class="QLabel" name="position_control_parameter_label_2">
     <property name="geometry">
      <rect>
-      <x>370</x>
-      <y>370</y>
+      <x>400</x>
+      <y>390</y>
       <width>241</width>
       <height>20</height>
      </rect>
@@ -525,8 +525,8 @@
    <widget class="QPushButton" name="pos_setting_btn">
     <property name="geometry">
      <rect>
-      <x>350</x>
-      <y>450</y>
+      <x>380</x>
+      <y>470</y>
       <width>91</width>
       <height>23</height>
      </rect>
@@ -538,9 +538,9 @@
    <widget class="QTextEdit" name="Neutral_angle">
     <property name="geometry">
      <rect>
-      <x>120</x>
-      <y>620</y>
-      <width>45</width>
+      <x>180</x>
+      <y>650</y>
+      <width>81</width>
       <height>31</height>
      </rect>
     </property>
@@ -548,8 +548,8 @@
    <widget class="QLabel" name="pos_label_12">
     <property name="geometry">
      <rect>
-      <x>90</x>
-      <y>660</y>
+      <x>160</x>
+      <y>690</y>
       <width>111</width>
       <height>20</height>
      </rect>
@@ -561,13 +561,164 @@
      <set>Qt::AlignCenter</set>
     </property>
    </widget>
+   <widget class="QTextEdit" name="amplitude_ramp">
+    <property name="geometry">
+     <rect>
+      <x>900</x>
+      <y>550</y>
+      <width>101</width>
+      <height>31</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLabel" name="pos_label_13">
+    <property name="geometry">
+     <rect>
+      <x>820</x>
+      <y>560</y>
+      <width>71</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Amplitude:</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignCenter</set>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="ramp_setting_btn">
+    <property name="geometry">
+     <rect>
+      <x>730</x>
+      <y>700</y>
+      <width>81</width>
+      <height>23</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Setting</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="pos_label_14">
+    <property name="geometry">
+     <rect>
+      <x>820</x>
+      <y>610</y>
+      <width>71</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>velocity :</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignCenter</set>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_4">
+    <property name="geometry">
+     <rect>
+      <x>760</x>
+      <y>520</y>
+      <width>251</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>12</pointsize>
+     </font>
+    </property>
+    <property name="text">
+     <string>Ramp Control Parameter</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignCenter</set>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="ramp_start_btn">
+    <property name="geometry">
+     <rect>
+      <x>820</x>
+      <y>700</y>
+      <width>91</width>
+      <height>23</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Start</string>
+    </property>
+   </widget>
+   <widget class="QTextEdit" name="velocity_ramp">
+    <property name="geometry">
+     <rect>
+      <x>900</x>
+      <y>600</y>
+      <width>101</width>
+      <height>31</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QTextEdit" name="pos_offset_ramp">
+    <property name="geometry">
+     <rect>
+      <x>900</x>
+      <y>650</y>
+      <width>101</width>
+      <height>31</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLabel" name="pos_label_15">
+    <property name="geometry">
+     <rect>
+      <x>770</x>
+      <y>660</y>
+      <width>121</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Position Offset:</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignCenter</set>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="sinusoidal_stop_btn_2">
+    <property name="geometry">
+     <rect>
+      <x>920</x>
+      <y>700</y>
+      <width>91</width>
+      <height>23</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Stop</string>
+    </property>
+   </widget>
+   <widget class="QCheckBox" name="ramp_control_check">
+    <property name="geometry">
+     <rect>
+      <x>90</x>
+      <y>500</y>
+      <width>151</width>
+      <height>21</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Ramp Control</string>
+    </property>
+   </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>798</width>
+     <width>1153</width>
      <height>26</height>
     </rect>
    </property>
