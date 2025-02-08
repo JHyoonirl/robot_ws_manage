@@ -686,7 +686,7 @@
      <set>Qt::AlignCenter</set>
     </property>
    </widget>
-   <widget class="QPushButton" name="sinusoidal_stop_btn_2">
+   <widget class="QPushButton" name="ramp_stop_btn">
     <property name="geometry">
      <rect>
       <x>920</x>
