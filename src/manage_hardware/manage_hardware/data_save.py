@@ -13,6 +13,7 @@ from collections import deque
 import datetime
 import time
 from PyQt5 import uic
+import signal
 
 class DataSaver(Node):
     def __init__(self):
@@ -25,7 +26,7 @@ class DataSaver(Node):
 
         self.force_x = self.force_y = self.force_z = 0.0
         self.torque_x = self.torque_y = self.torque_z = 0.0
-        self.votage = self.angle = self.velocity = 0.0
+        self.voltage = self.torque_current = self.knee_angle =self.velocity = 0.0
         
         # self.prev_pwm = None
         # self.prev_force = (None, None, None)
@@ -51,12 +52,14 @@ class DataSaver(Node):
         self.torque_ = ()
         self.motor_ = ()
 
+        self.past_time_motor = time.time()
+
         
-        self.Thruster_publisher = self.create_publisher(Float64, 'Thruster_signal', self.qos_profile) # 실험을 위해 주석 처리
+        self.Thruster_publisher = self.create_publisher(Float64, 'thruster_signal', self.qos_profile) # 실험을 위해 주석 처리
         
         self.thruster_sub = self.create_subscription(
             Float64,
-            'Thruster_signal',
+            'thruster_signal',
             self.thruster_subscriber,
             self.qos_profile)
         
@@ -128,14 +131,17 @@ class DataSaver(Node):
 
     def motor_subscriber(self, msg):
         # with self.data_lock:
-        self.votage, self.angle, self.velocity = msg.data
+        self.voltage, self.torque_current, self.knee_angle, self.velocity = msg.data
         self.motor_timestamp = time.time()
         if self.saving_status and self.motor_status == True:
             dt_object = datetime.datetime.fromtimestamp(self.motor_timestamp)
             formatted_time = dt_object.strftime('%H:%M:%S.%f')[:-3]
 
-            data_entry = [formatted_time, self.votage, self.angle, self.velocity]
+            data_entry = [formatted_time, self.voltage, self.torque_current, self.knee_angle, self.velocity]
             self.data_sheet_motor.append(data_entry)
+        # self.get_logger().info('{0}'.format(time.time() - self.past_time_motor))
+        # self.past_time_motor = time.time()
+
             # self.last_force_save_time = time.time()
 
 class DataSaveApp(QMainWindow):
@@ -148,9 +154,9 @@ class DataSaveApp(QMainWindow):
         self.ui = uic.loadUi('UI/data_save.ui', self)
         self.init_ui()
 
-        self.thruster_status = 0
-        self.sensor_status = 0
-        self.motor_status = 0
+        self.thruster_status = True
+        self.sensor_status = True
+        self.motor_status = True
         
         self.show()
 
@@ -158,7 +164,7 @@ class DataSaveApp(QMainWindow):
         # QTimer to periodically update the data
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_data)
-        self.timer.start(5)  # Update every 5ms --> 수정 필요함!!!!
+        self.timer.start(50)  # Update every 5ms --> 수정 필요함!!!!
 
         # Main layout setup
         # main_layout = QVBoxLayout()
@@ -212,7 +218,7 @@ class DataSaveApp(QMainWindow):
 
         if self.motor_status == True:
             # self.votage = self.angle = self.velocity
-            self.Motor_data_text.setPlainText(f'motor: {self.node.votage:.2f}, {self.node.angle:.2f}, {self.node.velocity:.2f}')
+            self.Motor_data_text.setPlainText(f'motor: {self.node.voltage:.2f}, {self.node.torque_current:.2f},{self.node.knee_angle:.2f}, {self.node.velocity:.2f}')
         else:
             self.Motor_data_text.clear()
     
@@ -274,21 +280,9 @@ class DataSaveApp(QMainWindow):
                     df_torque = pd.DataFrame(self.node.data_sheet_torque, columns=['Time', 'Torque_X', 'Torque_Y', 'Torque_Z'])
                     df_torque.to_excel(f'{self.file_name}_torque.xlsx', index=False)
                 if self.motor_status == True:
-                    df_motor = pd.DataFrame(self.node.data_sheet_motor, columns=['Time', 'Voltage', 'Angle', 'Velocity'])
+                    df_motor = pd.DataFrame(self.node.data_sheet_motor, columns=['Time', 'voltage', 'torque_current', 'angle', 'velocity'])
                     df_motor.to_excel(f'{self.file_name}_motor.xlsx', index=False)
                 
-                
-                # df_thruster_signal.to_excel(f'{self.file_name}_thruster_signal.xlsx', index=False)
-                # df_force.to_excel(f'{self.file_name}_force.xlsx', index=False)
-                # df_torque.to_excel(f'{self.file_name}_torque.xlsx', index=False)
-                # 세 데이터 프레임을 시간 열을 기준으로 합치기
-                # df_merged = pd.merge(pd.merge(df_thruster_signal, df_force, on='Time', how='outer'), df_torque, on='Time', how='outer')
-                
-                # 누락된 데이터가 있는 행 제거
-                # df_cleaned = df_merged.dropna()
-
-                # Excel 파일로 저장
-                # df_merged.to_excel(f'{self.file_name}.xlsx', index=False)
                 print(f'Data saved to {self.file_name}')
                 self.Save_status_text.setText("Data save complete")
             except Exception as e:
@@ -331,6 +325,13 @@ def run_node(node):
     rclpy.spin(node)
 
 def main(args=None):
+    def signal_handler(sig, frame):
+        print("Shutting down...")
+        QApplication.quit()  # QApplication을 종료합니다.
+
+    signal.signal(signal.SIGINT, signal_handler)  # SIGINT 신호를 처리하기 위해 핸들러를 등록합니다.
+    
+    
     try:
         rclpy.init(args=args)
         node = DataSaver()
@@ -339,7 +340,7 @@ def main(args=None):
 
         app = QApplication(sys.argv)
         ex = DataSaveApp(node)
-        app.exec_()
+        sys.exit(app.exec_())
 
         node.destroy_node()
         rclpy.shutdown()

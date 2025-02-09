@@ -1,7 +1,7 @@
-bool Thruster_switch
+bool thruster_switch
 bool rehab_switch
 bool sensor_bias_set
 bool sensor_read_data
 ---
-bool Thruster_result
+bool thruster_result
 bool sensor_bias_result
