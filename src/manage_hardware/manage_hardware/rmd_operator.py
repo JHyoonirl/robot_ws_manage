@@ -61,17 +61,20 @@ class Motor(Node):
         self.control_check_status = False
         self.position_control_check_status = False # 작동 Main Switch
         self.sinusoidal_control_check_status = False # 작동 Main Switch
+        self.ramp_control_check_status = False # 작동 Main Switch
         self.position_control_activate_status = False # step 작동 on/off Switch
         self.sinusoidal_control_activate_status = False # step 작동 on/off Switch
+        self.ramp_control_activate_status = False # step 작동 on/off Switch
         # self.neutral_angle = 0
         self.neutral_torque = 0 # 중립 위치에서 발생하는 토크는?
         self.position_error = 0
 
-        with open("assets/motor_info.json", "r") as fr:
+        with open("RMD/motor_info.json", "r") as fr:
             data = json.load(fr)
         # print(data)
 
         self.Kp = float(data["kp"])
+        self.Kp_tmp = 30
         self.Ki = float(data["ki"])
         self.Kd = float(data["kd"])
         self.Neutral_angle = float(data["neutral_angle"]) # 무릎의 0도에 해당하는 motor encoder의 각도
@@ -86,7 +89,14 @@ class Motor(Node):
         self.amplitude = 0.0
         self.period = 0.0
         self.pos_offset = 0.0
-        self.RMD_timer = 0.0
+        self.RMD_timer_sinusoidal = 0.0
+
+        self.amplitude_ramp = 0.0 #  initial_condition
+        self.velocity_ramp = 0.0 # velocity
+        self.pos_offset_ramp = 0.0 # last_condition
+        self.RMD_timer_ramp = 0.0
+        self.state_ramp = 1 # 1: decrease 2: increase
+        self.waypoint_ramp = 0
 
         self.voltage = 0
         self.temperature = 0
@@ -164,6 +174,8 @@ class Motor(Node):
                     self.motor_step()
                 elif self.sinusoidal_control_check_status == True and self.sinusoidal_control_activate_status == True: # sine 제어 가능
                     self.motor_sine()
+                elif self.ramp_control_check_status == True and self.ramp_control_activate_status == True: # sine 제어 가능
+                    self.motor_ramp()
                 else:
                     self.motor_off()
 
@@ -171,7 +183,7 @@ class Motor(Node):
             # print(time.time() - self.past_time)
             self.past_time = time.time()
 
-            time.sleep(self.dt_sleep)
+            # time.sleep(self.dt_sleep)
 
 
     def motor_off(self):
@@ -217,7 +229,7 @@ class Motor(Node):
     def motor_sine(self):
         try:
             self.dt = time.time() - self.past_time
-            sine_time = time.time() - self.RMD_timer
+            sine_time = time.time() - self.RMD_timer_sinusoidal
             self.Desired_angle = self.amplitude * math.sin(self.period * sine_time) + self.pos_offset
 
             self.pos_error = self.Desired_angle - self.knee_angle
@@ -238,6 +250,75 @@ class Motor(Node):
 
             # Calculate the control output
             output = proportional + integral + derivative
+            if abs(output) > self.torque_threshold:
+                if output > 0:
+                    output = self.torque_threshold
+                elif output < 0:
+                    output = - self.torque_threshold
+            self.torque_out = output
+            temperature, torque, speed, angle = self.RMD.torque_closed_loop(int(output))
+            # self.get_logger().info('rmd torque, speed, angle: {0}'.format(torque, speed, angle))
+                        
+
+        except Exception as e:
+            print(f'Error3: {e}')
+
+    def motor_ramp(self):
+        try:
+            self.dt = time.time() - self.past_time
+            
+            # self.Desired_angle = self.amplitude * math.sin(self.period * sine_time) + self.pos_offset
+            
+            # if self.state_ramp == 1 and abs(self.Desired_angle - (self.pos_offset_ramp - self.amplitude_ramp)) < 1:
+            #     self.state_ramp = 2
+            #     self.waypoint_ramp = self.Desired_angle
+            #     self.RMD_timer_ramp = time.time()
+            # elif self.state_ramp == 2 and abs(self.Desired_angle - (self.pos_offset_ramp + self.amplitude_ramp)) < 1:
+            #     self.state_ramp = 1
+            #     self.waypoint_ramp = self.Desired_angle
+            #     self.RMD_timer_ramp = time.time()
+            
+            # if self.state_ramp == 1:
+            #     sign = -1
+            # elif self.state_ramp == 2:
+            #     sign = 1
+            ramp_time = time.time() - self.RMD_timer_ramp
+            if ramp_time < 3:
+                ramp_time = 0
+            else:
+                ramp_time = ramp_time - 3
+            sign = -1
+
+            self.Desired_angle = self.amplitude_ramp + sign * self.velocity_ramp * (ramp_time)
+
+            if self.Desired_angle < self.pos_offset_ramp:
+                self.Desired_angle = self.pos_offset_ramp
+
+            
+            self.get_logger().info('rself.state_ramp: {0}'.format(self.state_ramp))
+
+            self.pos_error = self.Desired_angle - self.knee_angle
+            # print(self.pos_error)
+
+            if ramp_time < 3:
+                proportional = self.Kp_tmp * self.pos_error
+            else:
+                proportional = self.Kp * self.pos_error
+            
+
+            # Integral term
+            self.pos_error_integral += self.pos_error * self.dt
+            integral = self.Ki * self.pos_error_integral
+
+            # Derivative term
+            derivative = self.Kd * (self.pos_error - self.pos_error_prev) / self.dt
+
+            # Update previous error
+            self.pos_error_prev = self.pos_error
+
+            # Calculate the control output
+            output = proportional + integral + derivative
+            self.torque_out = output
             if abs(output) > self.torque_threshold:
                 if output > 0:
                     output = self.torque_threshold
@@ -266,6 +347,7 @@ class MotorWindow(QMainWindow):
         self._RMD = RMD
         self.Desired_Angle_list = []
         self.Current_Angle_list = []
+        self.error_Angle_list = []
         self.Speed_list = []
         self.threadhold = 500
         self.ui = uic.loadUi('UI/motor.ui', self)
@@ -282,6 +364,7 @@ class MotorWindow(QMainWindow):
         
         self.Plot_Angle_desired_data = self.Plot_Angle.plot(pen='r', name='Angle_desired')
         self.Plot_Angle_current_data = self.Plot_Angle.plot(pen='b', name='Angle_current')
+        # self.Plot_Angle_error_data = self.Plot_Angle.plot(pen='g', name='Angle_current')
         # self.Plot_Angle.setTitle("Angle Readings")
         self.Plot_Angle.setBackground("w")
         # self.Plot_Angle.setYRange(-30, 30)
@@ -300,19 +383,22 @@ class MotorWindow(QMainWindow):
         ### 타이머 설정 ###
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_data)
-        # self.timer.start(10)  # 100ms 간격으로 업데이트
+        self.timer.start(100)  # 100ms 간격으로 업데이트
         
         # 체크 박스 정의
         self.control_on_off = self.findChild(QCheckBox, 'Control_on_off_check')
         self.position_control_check = self.findChild(QCheckBox, 'position_control_check')
         self.sinusoidal_control_check = self.findChild(QCheckBox, 'sinusoidal_control_check')
+        self.ramp_control_check = self.findChild(QCheckBox, 'ramp_control_check')
 
         self.control_on_off.stateChanged.connect(self.control_on_off_changed)
         self.position_control_check.setDisabled(True)
         self.sinusoidal_control_check.setDisabled(True)
+        self.ramp_control_check.setDisabled(True)
 
         self.position_control_check.stateChanged.connect(self.position_control_checked)
         self.sinusoidal_control_check.stateChanged.connect(self.sinusoidal_control_checked)
+        self.ramp_control_check.stateChanged.connect(self.ramp_control_checked)
 
         #textedit 정의
         self.Desired_pos = self.findChild(QTextEdit, 'desired_pos')
@@ -337,6 +423,10 @@ class MotorWindow(QMainWindow):
         self.period = self.findChild(QTextEdit, 'period')
         self.pos_offset = self.findChild(QTextEdit, 'pos_offset')
 
+        self.amplitude_ramp = self.findChild(QTextEdit, 'amplitude_ramp')
+        self.velocity_ramp = self.findChild(QTextEdit, 'velocity_ramp')
+        self.pos_offset_ramp = self.findChild(QTextEdit, 'pos_offset_ramp')
+
         # buttons 정의
 
         self.system_quit_btn = self.findChild(QPushButton, 'system_quit_btn')
@@ -351,6 +441,10 @@ class MotorWindow(QMainWindow):
         self.sinusoidal_start_btn = self.findChild(QPushButton, 'sinusoidal_start_btn')
         self.sinusoidal_stop_btn = self.findChild(QPushButton, 'sinusoidal_stop_btn')
 
+        self.ramp_setting_btn = self.findChild(QPushButton, 'ramp_setting_btn')
+        self.ramp_start_btn = self.findChild(QPushButton, 'ramp_start_btn')
+        self.ramp_stop_btn = self.findChild(QPushButton, 'ramp_stop_btn')
+
         self.system_quit_btn.clicked.connect(self.system_quit_btn_clicked)
 
         self.parameter_setting_btn.clicked.connect(self.parameter_setting_btn_clicked)
@@ -362,6 +456,10 @@ class MotorWindow(QMainWindow):
         self.sinusoidal_setting_btn.clicked.connect(self.sinusoidal_setting_btn_clicked)
         self.sinusoidal_start_btn.clicked.connect(self.sinusoidal_start_btn_clicked)
         self.sinusoidal_stop_btn.clicked.connect(self.sinusoidal_stop_btn_clicked)
+
+        self.ramp_setting_btn.clicked.connect(self.ramp_setting_btn_clicked)
+        self.ramp_start_btn.clicked.connect(self.ramp_start_btn_clicked)
+        self.ramp_stop_btn.clicked.connect(self.ramp_stop_btn_clicked)
 
         self.btn_off()
 
@@ -433,6 +531,8 @@ class MotorWindow(QMainWindow):
 
     def sinusoidal_setting_btn_clicked(self):
         if self._RMD.sinusoidal_control_check_status != False:
+            
+
             amplitude = self.amplitude.toPlainText()
             period = self.period.toPlainText()
             pos_offset = self.pos_offset.toPlainText()
@@ -442,29 +542,62 @@ class MotorWindow(QMainWindow):
                 self._RMD.pos_offset = float(pos_offset)
             except Exception as e:
                 print(f"Error: {e}")
+            except Exception as e:
+                print(f"Error: {e}")
 
 
     def sinusoidal_start_btn_clicked(self):
         if self._RMD.sinusoidal_control_check_status != False:
             self._RMD.sinusoidal_control_activate_status = True
-            self._RMD.RMD_timer = time.time()
+            self._RMD.RMD_timer_sinusoidal = time.time()
 
     def sinusoidal_stop_btn_clicked(self):
         if self._RMD.sinusoidal_control_check_status != False:
             self._RMD.sinusoidal_control_activate_status = False
+
+    def ramp_setting_btn_clicked(self):
+        if self._RMD.ramp_control_check_status != False:
+            amplitude_ramp = self.amplitude_ramp.toPlainText()
+            velocity_ramp = self.velocity_ramp.toPlainText()
+            pos_offset_ramp = self.pos_offset_ramp.toPlainText()
+            try:
+                self._RMD.amplitude_ramp = float(amplitude_ramp)
+                self._RMD.velocity_ramp = float(velocity_ramp)
+                self._RMD.pos_offset_ramp = float(pos_offset_ramp)
+                self._RMD.waypoint_ramp = float(pos_offset_ramp)
+            except Exception as e:
+                print(f"Error: {e}")
+
+
+    def ramp_start_btn_clicked(self):
+        if self._RMD.ramp_control_check_status != False:
+            self._RMD.ramp_control_activate_status = True
+            self._RMD.RMD_timer_ramp = time.time()
+            self._RMD.state_ramp = 1
+
+    def ramp_stop_btn_clicked(self):
+        if self._RMD.ramp_control_check_status != False:
+            self._RMD.ramp_control_activate_status = False
+            self._RMD.state_ramp = 1
+
+    
     
     def control_on_off_changed(self, state):
         if state == Qt.Checked:
             self._RMD.control_check_status = True
             self.position_control_check.setEnabled(True)
             self.sinusoidal_control_check.setEnabled(True)
+            self.ramp_control_check.setEnabled(True)
+            
             # self.btn_on()
         else:
             self._RMD.control_check_status = False
             self._RMD.position_control_check_status = False
             self._RMD.sinusoidal_control_check_status = False
+            self._RMD.ramp_control_check_status = False
             self.position_control_check.setDisabled(True)
             self.sinusoidal_control_check.setDisabled(True)
+            self.ramp_control_check.setDisabled(True)
             # self.btn_off()
 
     def btn_on(self):
@@ -476,6 +609,10 @@ class MotorWindow(QMainWindow):
         self.sinusoidal_start_btn.setEnabled(True)
         self.sinusoidal_stop_btn.setEnabled(True)
 
+        self.ramp_setting_btn.setEnabled(True)
+        self.ramp_start_btn.setEnabled(True)
+        self.ramp_stop_btn.setEnabled(True)
+
     def pos_btn_on(self):
         self.pos_setting_btn.setEnabled(True)
         self.pos_start_btn.setEnabled(True)
@@ -485,6 +622,10 @@ class MotorWindow(QMainWindow):
         self.sinusoidal_start_btn.setDisabled(True)
         self.sinusoidal_stop_btn.setDisabled(True)
 
+        self.ramp_setting_btn.setDisabled(True)
+        self.ramp_start_btn.setDisabled(True)
+        self.ramp_stop_btn.setDisabled(True)
+
     def sinusoidal_btn_on(self):
         self.pos_setting_btn.setDisabled(True)
         self.pos_start_btn.setDisabled(True)
@@ -493,6 +634,23 @@ class MotorWindow(QMainWindow):
         self.sinusoidal_setting_btn.setEnabled(True)
         self.sinusoidal_start_btn.setEnabled(True)
         self.sinusoidal_stop_btn.setEnabled(True)
+
+        self.ramp_setting_btn.setDisabled(True)
+        self.ramp_start_btn.setDisabled(True)
+        self.ramp_stop_btn.setDisabled(True)
+
+    def ramp_btn_on(self):
+        self.pos_setting_btn.setDisabled(True)
+        self.pos_start_btn.setDisabled(True)
+        self.pos_stop_btn.setDisabled(True)
+    
+        self.sinusoidal_setting_btn.setDisabled(True)
+        self.sinusoidal_start_btn.setDisabled(True)
+        self.sinusoidal_stop_btn.setDisabled(True)
+
+        self.ramp_setting_btn.setEnabled(True)
+        self.ramp_start_btn.setEnabled(True)
+        self.ramp_stop_btn.setEnabled(True)
     
     def btn_off(self):
         self.pos_setting_btn.setDisabled(True)
@@ -503,16 +661,24 @@ class MotorWindow(QMainWindow):
         self.sinusoidal_start_btn.setDisabled(True)
         self.sinusoidal_stop_btn.setDisabled(True)
 
+        self.ramp_setting_btn.setDisabled(True)
+        self.ramp_start_btn.setDisabled(True)
+        self.ramp_stop_btn.setDisabled(True)
+
     def position_control_checked(self, state):
         # state == 0 : unchecked, state == 2 : checked
         if state == Qt.Checked:
             self._RMD.position_control_check_status = True
             self._RMD.sinusoidal_control_check_status = False
+            self._RMD.ramp_control_check_status = False
             self.pos_btn_on()
 
             if self._RMD.sinusoidal_control_check_status == False and self.sinusoidal_control_check.checkState() == 2:
                 self.sinusoidal_control_check.toggle()
                 # print(self._RMD.position_control_check_status, self._RMD.sinusoidal_control_check_status)
+
+            if self._RMD.ramp_control_check_status == False and self.ramp_control_check.checkState() == 2:
+                self.ramp_control_check.toggle()
                 
         else:
             self.position_control_check_status = False
@@ -521,17 +687,35 @@ class MotorWindow(QMainWindow):
         if state == Qt.Checked:
             self._RMD.sinusoidal_control_check_status = True
             self._RMD.position_control_check_status = False
+            self._RMD.ramp_control_check_status = False
             self.sinusoidal_btn_on()
             if self._RMD.position_control_check_status == False and self.position_control_check.checkState() == 2:
                 self.position_control_check.toggle()
                 # print(self._RMD.position_control_check_status, self._RMD.sinusoidal_control_check_status)
+            if self._RMD.ramp_control_check_status == False and self.ramp_control_check.checkState() == 2:
+                self.ramp_control_check.toggle()
         else:
             self.sinusoidal_control_check_status = False
+
+    def ramp_control_checked(self, state):
+        if state == Qt.Checked:
+            self._RMD.ramp_control_check_status = True
+            self._RMD.position_control_check_status = False
+            self._RMD.sinusoidal_control_check_status = False
+            self.ramp_btn_on()
+            if self._RMD.position_control_check_status == False and self.position_control_check.checkState() == 2:
+                self.position_control_check.toggle()
+                # print(self._RMD.position_control_check_status, self._RMD.sinusoidal_control_check_status)
+            if self._RMD.sinusoidal_control_check_status == False and self.sinusoidal_control_check.checkState() == 2:
+                self.sinusoidal_control_check.toggle()
+        else:
+            self.ramp_control_check_status = False
 
     def update_data(self):
         Motor_angle = self._RMD.angle
         Current_angle = self._RMD.knee_angle
         Desired_angle = self._RMD.Desired_angle
+        torque = self._RMD.torque_out
 
         velocity = self._RMD.velocity
         self.Angle_text.setText(f"{Motor_angle:.2f}")
@@ -548,11 +732,15 @@ class MotorWindow(QMainWindow):
             self.Speed_list.pop(0)
         if len(self.Current_Angle_list) >= self.threadhold:
             self.Current_Angle_list.pop(0)
+        if len(self.error_Angle_list) >= self.threadhold:
+            self.error_Angle_list.pop(0)
         self.Desired_Angle_list.append(Desired_angle)
         self.Current_Angle_list.append(Current_angle)
-        self.Speed_list.append(velocity)
+        self.error_Angle_list.append(10*(Desired_angle - Current_angle))
+        self.Speed_list.append(torque)
         self.Plot_Angle_desired_data.setData(self.Desired_Angle_list)
         self.Plot_Angle_current_data.setData(self.Current_Angle_list)
+        # self.Plot_Angle_error_data.setData(self.error_Angle_list)
         self.Plot_Velocity_data.setData(self.Speed_list)
 
 def run_node(node):
