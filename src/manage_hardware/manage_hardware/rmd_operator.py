@@ -69,7 +69,7 @@ class Motor(Node):
         self.neutral_torque = 0 # 중립 위치에서 발생하는 토크는?
         self.position_error = 0
 
-        with open("RMD/motor_info.json", "r") as fr:
+        with open("custom_json/motor_info.json", "r") as fr:
             data = json.load(fr)
         # print(data)
 

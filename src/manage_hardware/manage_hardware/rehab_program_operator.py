@@ -1,54 +1,35 @@
 import numpy as np
-# from rclpy.node import Node
-# from rclpy.qos import QoSProfile
+import rclpy
+from rclpy.node import Node
+from std_msgs.msg import Float64, Float64MultiArray
+from geometry_msgs.msg import Vector3
+from custominterface.srv import Status
+from rclpy.qos import QoSProfile
 import math
+from thruster_torque_converter import thruster_converter
+from passive_program import Passive_mode
+from RMD_custom import RMD# 가정한 모듈과 클래스 이름
+
 import time
-import threading
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QPushButton, QVBoxLayout, QSpinBox, QLabel, QDoubleSpinBox, QCheckBox
 from PyQt5.QtCore import QTimer, Qt
 from PyQt5 import uic
 from pyqtgraph import PlotWidget, TextItem
 from threading import Thread
+import threading
 import sys
 import signal
 import json
 
 
 # class Rehab(Node):
-class Rehab():
+class Rehab(Node):
     def __init__(self):
-        '''
-        재활 운동에 사용되는 기본적인 안전 정보를 가지고 있는 객체
-        '''
+        super().__init__('rehab_program_operator')
+        
+        self.load_from_json()
 
-        with open("assets/motor_info.json", "r") as fr:
-            data = json.load(fr)
-        # print(data)
-
-        self.Kp_motor = float(data["kp"])
-        self.Ki_motor = float(data["ki"])
-        self.Kd_motor = float(data["kd"])
-        self.Neutral_angle = float(data["neutral_angle"])
-
-        with open("assets/rehab.json", "r") as fr:
-            data = json.load(fr)
-
-
-        self.ThetaMin = float(data["theta_min"])
-        self.ThetaMax = float(data["theta_max"])
-        self.dThetaMax = float(data["dtheta_max"])
-        self.ddThetaMax = float(data["ddtheta_max"])
-        self.acc_time = float(data["acc_time"])
-        self.repeatationnumber = float(data["repeatation_number"])
-        self.thrusteracc = float(data["thruster_acc"])
-        self.holdtime = float(data["hold_time"])
-        self.Kp_passive = float(data["kp_passive"])
-        self.Ki_passive = float(data["ki_passive"])
-        self.Kd_passive = float(data["kd_passive"])
-        self.M_resistance = float(data["m_resistance"])
-        self.Kp_assistance = float(data["kp_assistance"])
-        self.Ki_assistance = float(data["ki_assistance"])
-        self.Kd_assistance = float(data["kd_assistance"])
+        self.qos_profile = QoSProfile(depth=10)
 
         self.desired_angle = 0.0
         self.current_angle = 0.0
@@ -56,6 +37,19 @@ class Rehab():
         
         self.dt = 0.005
         self.past_time = 0.0
+        self.thruster_torque = 0
+
+        self.input_torque_passive= 0
+        self.integral_error_passive = 0
+        self.error_passive = 0
+
+        self.input_torque_resistance= 0
+        self.integral_error_resistance = 0
+        self.error_resistance = 0
+
+        self.input_torque_assistance= 0
+        self.integral_error_assistance = 0
+        self.error_assistance = 0
 
         '''
         운동을 진행하는 프로토콜과 관련된 method와 정보를 가지고 있는 객체
@@ -83,14 +77,19 @@ class Rehab():
         '''
         IMU 값 가져오기
         '''
+        self.read_imu()
 
         '''
         RMD 모터 제어하고 값 Publish
         '''
+        # self.setting_motor()
 
         '''
         Thruster 제어하고 값 Publish
+
         '''
+        self.setting_thruster()
+
     def controller(self):
         while True:
             
@@ -99,23 +98,236 @@ class Rehab():
                     pass
                 if self.passive_control_check_status == True and self.passive_control_activate_status == True:
                     self.desired_angle, self.desired_velocity = self.passive_mode.Passive_exercise()
-                    # print('Passive_exercise')
-                    # print(self.desired_angle)
-                if self.resistance_control_check_status == True and self.resistance_control_activate_status == True:
+                    self.input_torque_passive, self.integral_error_passive, self.error_passive = self.PID_Controller(self.desired_angle * math.pi / 180, self.current_angle* math.pi / 180, self.integral_error_passive, 
+                                                                                                                    self.error_passive, self.Kp_passive, self.Ki_passive, self.Kd_passive, self.past_time)
+                    self.thruster_torque = self.input_torque_passive
+                    self.get_logger().info('{0}'.format(self.input_torque_passive))
+                    # self.publish_thruster(self.input_torque_passive)
+                elif self.resistance_control_check_status == True and self.resistance_control_activate_status == True:
                     pass
-                if self.assistance_control_check_status == True and self.assistance_control_activate_status == True:
+                elif self.assistance_control_check_status == True and self.assistance_control_activate_status == True:
                     pass
+                else:
+                    self.thruster_torque = 0
             else:
-                pass
+                self.thruster_torque = 0
+                # pass
             self.past_time = time.time() # 따로 loop에서 진행해야 할 수 도?
             time.sleep(self.dt)
+    def load_from_json(self):
 
-    def PID_Controller(self, desired_angle, current_angle, integral_error, last_error, p, i, d):
+        '''
+        재활 운동에 사용되는 기본적인 안전 정보를 가지고 있는 객체
+        '''
+
+        with open("custom_json/motor_info.json", "r") as fr:
+            data = json.load(fr)
+        # print(data)
+
+        self.Kp_motor = float(data["kp"])
+        self.Ki_motor = float(data["ki"])
+        self.Kd_motor = float(data["kd"])
+        self.Neutral_angle = float(data["neutral_angle"])
+
+        with open("custom_json/rehab.json", "r") as fr:
+            data = json.load(fr)
+
+        
+        self.ThetaMin = float(data["theta_min"])
+        self.ThetaMax = float(data["theta_max"])
+        self.dThetaMax = float(data["dtheta_max"])
+        self.ddThetaMax = float(data["ddtheta_max"])
+        self.acc_time = float(data["acc_time"])
+        self.repeatationnumber = float(data["repeatation_number"])
+        self.thrusteracc = float(data["thruster_acc"])
+        self.holdtime = float(data["hold_time"])
+        self.Kp_passive = float(data["kp_passive"])
+        self.Ki_passive = float(data["ki_passive"])
+        self.Kd_passive = float(data["kd_passive"])
+        self.M_resistance = float(data["m_resistance"])
+        self.Kp_assistance = float(data["kp_assistance"])
+        self.Ki_assistance = float(data["ki_assistance"])
+        self.Kd_assistance = float(data["kd_assistance"])
+    def controller_reset(self):
+        self.input_torque_passive= 0
+        self.integral_error_passive = 0
+        self.error_passive = 0
+
+        self.input_torque_resistance= 0
+        self.integral_error_resistance = 0
+        self.error_resistance = 0
+
+        self.input_torque_assistance= 0
+        self.integral_error_assistance = 0
+        self.error_assistance = 0
+    def read_imu(self):
+        self.imu_shank = self.create_subscription(
+            Vector3,
+            'imu_data_shank',
+            self.imu_to_knee_angle,
+            self.qos_profile
+        )
+        
+    def imu_to_knee_angle(self, msg):
+        self.current_angle = float( - msg.x) + 90
+
+    def setting_motor(self):
+        self.declare_parameter('usb_port', '/dev/ttyACM0')
+        usb_port = self.get_parameter('usb_port').get_parameter_value().string_value
+        
+
+        self.RMD = RMD(0x141)
+        self.RMD.setup('slcan', usb_port)
+
+        self.Motor_info_publisher = self.create_publisher(Float64MultiArray, 'Motor_info', self.qos_profile)
+        # self.Motor_velocity_publisher = self.create_publisher(Float64, 'Motor_velocity', self.qos_profile)
+        
+        ## 모터 반시계 회전(-)은 Extension
+        ## 모터 시계 회전(+)은 flexion
+
+        self.MOTOR_ID = 1
+        self.ANGLE_INIT = 10
+        self.VELOCITY_LIMIT = 5000
+        self.Desired_angle = 0.0
+        self.control_check_status = False
+        self.position_control_check_status = False # 작동 Main Switch
+        self.sinusoidal_control_check_status = False # 작동 Main Switch
+        self.ramp_control_check_status = False # 작동 Main Switch
+        self.position_control_activate_status = False # step 작동 on/off Switch
+        self.sinusoidal_control_activate_status = False # step 작동 on/off Switch
+        self.ramp_control_activate_status = False # step 작동 on/off Switch
+        # self.neutral_angle = 0
+        self.neutral_torque = 0 # 중립 위치에서 발생하는 토크는?
+        self.position_error = 0
+
+        self.knee_angle = 0 # 무릎 각도 = encoder angle - self.Neutral_angle
+
+
+        self.voltage = 0
+        self.temperature = 0
+        self.torque_current = 0
+        self.velocity = 0
+        self.angle = 0
+
+        self.torque_threshold = 650
+
+        self.torque_out = 0
+        status_1 = self.init_motor()
+        status_2 = self.init_acceleration()
+
+        self.motor_contol_thread = threading.Thread(target=self.sensing_motor, daemon=True)
+        if status_1 == True and status_2 == True:
+            self.motor_contol_thread.start()
+    
+    def init_motor(self):
+        # 스케일링된 값들을 바이트 배열로 변환하여 전달
+        response = self.RMD.read_pid()
+        data = response.data
+        self.kp_cur = data[2]
+        self.ki_cur = data[3]
+        self.kp_vel = data[4]
+        self.ki_vel = data[5]
+        self.kp_pos = data[6]
+        self.ki_pos = data[7]
+
+        print(self.kp_cur, self.ki_cur)
+        print(self.kp_vel, self.ki_vel)
+        print(self.kp_pos, self.ki_pos)
+        data = [
+            self.RMD.byteArray(self.kp_cur, 1) ,
+            self.RMD.byteArray(self.ki_cur, 1),
+            self.RMD.byteArray(self.kp_vel, 1),
+            self.RMD.byteArray(self.ki_vel, 1),
+            self.RMD.byteArray(self.kp_pos, 1),
+            self.RMD.byteArray(self.ki_pos, 1)
+        ]
+        # 바이트 배열을 하나의 플랫 리스트로 변환
+        flat_data = [item for sublist in data for item in sublist]
+        self.RMD.write_pid_ram(flat_data)
+        print('initialized Motor')
+        return True
+
+    def init_acceleration(self):
+        for i in range(4):
+            index = self.RMD.byteArray(i, 1)
+            response = self.RMD.read_acceleration(index)
+            data = response.data
+            acc = int.from_bytes(data[4:8], byteorder='little', signed=True)
+            input_acc = self.RMD.byteArray(20000, 4)
+            self.RMD.write_acceleration(index, input_acc)
+        print('initialized Motor acc')
+        return True
+    
+    def motor_off(self):
+        self.RMD.raw_motor_off()
+        self.pos_error = 0
+        self.pos_error_prev = 0
+        self.pos_error_integral = 0
+    
+    def sensing_motor(self):
+        self.voltage, self.temperature, self.torque_current, self.velocity, self.angle, error = self.RMD.status_motor() #
+        self.knee_angle = self.angle - self.Neutral_angle # encoder angle - neutral angle
+        self.motor_info = Float64MultiArray()
+        self.motor_info.data = [self.voltage, self.torque_current, self.knee_angle, self.velocity]
+        self.Motor_info_publisher.publish(self.motor_info)
+    
+    def setting_thruster(self):
+        # self.cli = self.create_client(Status, 'thruster_server')
+        # while not self.cli.wait_for_service(timeout_sec=1.0):
+        #     self.get_logger().info('service not available, waiting again...')
+
+        self.thruster_publisher = self.create_publisher(Float64, 'thruster_signal', self.qos_profile)
+        self.thruster = 50.0  # 초기 thruster 값 설정
+        self.torque = 0
+        self.thruster_response = True  # 서비스 응답 상태 초기화
+        self.control_mode = 0 # 0: thruster direct, 1: thruster controlled by torque, 2: neutral
+        self.torque_converter = thruster_converter()
+        # 실험을 위해 주석 처리
+
+        self.timer = self.create_timer(0.005, self.publish_thruster)
+        
+    def send_request(self, thruster_switch):
+        req = Status.Request()
+        req.thruster_switch = thruster_switch
+        # try:
+        future = self.cli.call_async(req)
+        future.add_done_callback(self.handle_service_response)
+        
+    # 필요한 경우 리소스를 재설정하거나 복구 코드 실행
+
+    def handle_service_response(self, future):
+        try:
+            response = future.result()
+            # self.thruster_response = response.thruster_result
+            self.thruster_response = True
+            self.get_logger().info(f'Service call failed {self.thruster_response}')
+        except Exception as e:
+            self.get_logger().error(f'Service call failed {e}')
+
+    def publish_thruster(self):
+        msg = Float64()
+        time_ = Float64()
+        if self.thruster_response:
+            
+            msg.data = self.torque_converter.torque_to_percentage(self.thruster_torque)
+            if msg.data > 100:
+                msg.data = 100
+            elif msg.data  < 0:
+                msg.data = 0
+        else:
+            msg.data = 50.0  # thruster 값을 기본값으로 재설정
+
+            self.get_logger().info('{0}'.format(msg.data))
+        msg.data = float(msg.data)
+        self.thruster_publisher.publish(msg)
+
+    def PID_Controller(self, desired_angle, current_angle, integral_error, last_error, p, i, d, past_time):
+        dt = time.time() - past_time
         error = desired_angle - current_angle
-        integral_error += error * self.dt
+        integral_error += error * dt
         p_term = p * error
         i_term = i * integral_error
-        d_term = d * (error - last_error) / self.dt
+        d_term = d * (error - last_error) / dt
         input_force = p_term + i_term + d_term
         
         return input_force, integral_error, error
@@ -124,151 +336,7 @@ class Rehab():
         pass
 
 
-
-class Passive_mode:
-    def __init__(self, rehab):
-        
-        self.rehab = rehab
-        self.reset()
-
-    def reset(self):
-        self.time_stamp = 0
-
-        self.desired_position_end = 0
-        self.desired_position_start = 0
-        self.dtheta_desired_current = 0
-
-        self.desired_angle = 0
-        self.current_position = 90
-        '''
-        나중에 센서값을 변경해야 함!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        
-        '''
-        self.current_velocity = 0
-
-        self.repeatation_memory = 0 
-        '''
-        짝수: Extension
-        홀수: Flexion
-        '''
-        self.protocol_start_time = 0
-
-        self.signal = 0
-        '''
-        signal: 0(현재 state 유지), 1(Generate desired trajectory), 2(Hold position)
-        '''
-        
-        self.state = 0
-        '''
-        ## state: 0(최초 움직임), 1(Desired trajectory를 따라 움직임), 2(Holding), 3(운동 종료)
-        '''
-        
-        self.integer_init_signal = 0 # 굳이 필요한가? 추후 확인 필요
-
-    def control_generator(self):
-        '''
-        Passive mode에서 시간에 따른 signal 생성
-        '''
-
-        if self.state == 0:
-            self.signal = 1
-            self.state = 1
-            self.time_stamp = time.time()
-            self.desired_angle = self.current_position
-            
-        elif self.state == 1 and abs(self.desired_position_end - self.current_position) < 2 and abs(self.current_velocity) < 0.05:
-            self.state = 2
-            self.time_stamp = time.time()
-        elif self.state == 2 and time.time() > self.time_stamp + self.rehab.holdtime:
-            self.state = 1
-            self.signal = 1
-            self.time_stamp = time.time()
-            self.repeatation_memory += 1
-        if self.repeatation_memory >= self.rehab.repeatationnumber:
-            self.state = 3
-            self.signal = 0
-        print(self.state, self.repeatation_memory)
-        
-
-    def desired_position_generator(self):
-        if self.signal == 1:
-            if self.repeatation_memory % 2 == 0:
-                self.desired_position_start = self.current_position
-                self.desired_position_end = self.rehab.ThetaMin
-            else:
-                self.desired_position_start = self.current_position
-                self.desired_position_end = self.rehab.ThetaMax
-
-            # desired position을 설정하고 나서 signal 다시 0으로 초기화
-            self.signal = 0
-
-
-    def desired_velocity_profile_generator(self):
-        '''
-        Passive mode에서 시간에 따른 프로파일 생성
-        '''
-        time_now = time.time() - self.time_stamp
-        self.dt = time.time() - self.rehab.past_time
-        acc_calculated = 0
-        distance = abs(self.desired_position_end - self.desired_position_start)
-        # constant_vel_time = distance/self.rehab.dThetaMax - self.rehab.acc_time
-        constant_vel_time = distance/self.rehab.dThetaMax - self.rehab.dThetaMax/self.rehab.ddThetaMax
-        acc_vel_time = self.rehab.dThetaMax/self.rehab.ddThetaMax
-        # Acc = self.rehab.dThetaMax
-        if self.state == 1:
-                
-            if self.desired_position_end < self.desired_position_start:
-                if time_now < acc_vel_time:
-                    self.dtheta_desired_current = - time_now*self.rehab.ddThetaMax
-
-                elif time_now < constant_vel_time + acc_vel_time:
-                    self.dtheta_desired_current =  - self.rehab.dThetaMax
-
-                elif time_now < constant_vel_time + 2*acc_vel_time:
-                    self.dtheta_desired_current = - self.rehab.dThetaMax + (time_now - (constant_vel_time + acc_vel_time))*self.rehab.ddThetaMax
-
-                else:
-                    self.dtheta_desired_current = 0
-            else:
-                if time_now < self.rehab.dThetaMax/self.rehab.ddThetaMax:
-                    self.dtheta_desired_current = time_now*self.rehab.ddThetaMax
-
-                elif time_now < constant_vel_time +self.rehab.dThetaMax/self.rehab.ddThetaMax:
-                    self.dtheta_desired_current = self.rehab.dThetaMax
-
-                elif time_now < constant_vel_time + 2*self.rehab.dThetaMax/self.rehab.ddThetaMax:
-                    self.dtheta_desired_current = self.rehab.dThetaMax - (time_now - (constant_vel_time + acc_vel_time))*self.rehab.ddThetaMax
-
-                else:
-                    self.dtheta_desired_current = 0
-
-        elif self.state == 2:
-            self.dtheta_desired_current = 0
-        
-
     
-    def desired_position_trajectory_generator(self):
-        '''
-        Passive mode에서 desired_velocity에 의한 위치 프로파일 생성
-        오일러 적분으로 진행
-        '''
-
-        self.desired_angle += self.dtheta_desired_current * self.dt
-        self.current_position = self.desired_angle
-        
-
-    def Passive_exercise(self):
-        '''
-        Passive mode 진행 프로토콜을 Main loop로 실행되는 부분
-        '''
-        self.control_generator()
-        self.desired_position_generator()
-        self.desired_velocity_profile_generator()
-        self.desired_position_trajectory_generator()
-        # print(self.desired_position_start, self.desired_position_end)
-        return self.desired_angle, self.dtheta_desired_current
-    
-
 class Active_Resistance_mode:
     def __init__(self, rehab):
         pass
@@ -319,9 +387,13 @@ class RehabApp(QMainWindow):
         self.plot_desired_velocity = self.plot_sensor.plot(pen='g', name='desired_angle')
         self.plot_torque_z = self.plot_torque.plot(pen='g', name='torque_z')
 
-        self.desired_angle_text = TextItem(text="Desired Angle: 0", anchor=(1, 0), color='b')
+        self.desired_angle_text = TextItem(text="Desired Angle: 0", anchor=(1, 0), color='r')
         self.plot_sensor.addItem(self.desired_angle_text, ignoreBounds=True)
         self.desired_angle_text.setPos(10, 0)  # 상단 오른쪽에 위치
+
+        self.current_angle_text = TextItem(text="current Angle: 0", anchor=(1, 0), color='b')
+        self.plot_sensor.addItem(self.current_angle_text, ignoreBounds=True)
+        self.current_angle_text.setPos(10, -20)  # 상단 오른쪽에 위치
 
         self.plot_sensor.setYRange(-50, 150, padding=0)
 
@@ -432,40 +504,7 @@ class RehabApp(QMainWindow):
         ### 타이머 설정 ###
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_data)
-        self.timer.start(5)  # 100ms 간격으로 업데이트
-        
-        
-        # 버튼 위젯 찾기
-        # self.btn_bias = self.findChild(QPushButton, 'Setbias')
-        # self.btn_start = self.findChild(QPushButton, 'Setstart')
-        # self.btn_stop = self.findChild(QPushButton, 'Setstop')
-        # self.btn_quit = self.findChild(QPushButton, 'Quit')
-
-        # 라벨 위젯 찾기
-        # self.label_force_x = self.findChild(QLabel, 'ForceX')
-        # self.label_torque_x = self.findChild(QLabel, 'TorqueX')
-        # self.label_force_y = self.findChild(QLabel, 'ForceY')
-        # self.label_torque_y = self.findChild(QLabel, 'TorqueY')
-        # self.label_force_z = self.findChild(QLabel, 'ForceZ')
-        # self.label_torque_z = self.findChild(QLabel, 'TorqueZ')
-
-        # self.force_labels = [
-        #     self.findChild(QLabel, 'force_x_data'),
-        #     self.findChild(QLabel, 'force_y_data'),
-        #     self.findChild(QLabel, 'force_z_data')
-        # ]
-
-        # self.torque_labels = [
-        #     self.findChild(QLabel, 'torque_x_data'),
-        #     self.findChild(QLabel, 'torque_y_data'),
-        #     self.findChild(QLabel, 'torque_z_data')
-        # ]
-
-        # 버튼 클릭 이벤트 연결
-        # self.btn_bias.clicked.connect(self.set_bias)
-        # self.btn_start.clicked.connect(self.turn_on)
-        # self.btn_stop.clicked.connect(self.turn_off)
-        # self.btn_quit.clicked.connect(self.close)
+        self.timer.start(5)  # 100ms 간격으로 업데이트  
 
     def control_on_off_changed(self, state):
         if state == Qt.Checked:
@@ -626,7 +665,7 @@ class RehabApp(QMainWindow):
             data = {"kp": self.rehab.Kp_motor, "ki": self.rehab.Ki_motor, "kd": self.rehab.Kd_motor, 
                     "neutral_angle": self.rehab.Neutral_angle}
             
-            with open("assets/motor_info.json", "w") as fr:
+            with open("custom_json/motor_info.json", "w") as fr:
                 json.dump(data, fr)
             print(f"motor setup successful!")
         except Exception as e:
@@ -670,7 +709,7 @@ class RehabApp(QMainWindow):
                     "ki_passive": self.rehab.Ki_passive, "kd_passive": self.rehab.Kd_passive, "m_resistance": self.rehab.M_resistance,
                     "kp_assistance": self.rehab.Kp_assistance, "ki_assistance": self.rehab.Ki_assistance, "kd_assistance": self.rehab.Kd_assistance}
             
-            with open("assets/rehab.json", "w") as fr:
+            with open("custom_json/rehab.json", "w") as fr:
                 json.dump(data, fr)
             print(f"Rehabilitation setup successful!")
         except Exception as e:
@@ -686,10 +725,10 @@ class RehabApp(QMainWindow):
         pass
 
     def thruster_on_btn_clicked(self):
-        pass
+        self.rehab.thruster_response = True
     
     def thruster_off_btn_clicked(self):
-        pass
+        self.rehab.thruster_response = False
 
     def passive_setup_btn_clicked(self):
         pass
@@ -702,6 +741,7 @@ class RehabApp(QMainWindow):
         if self.rehab.passive_control_check_status != False:
             self.rehab.passive_control_activate_status = False
             self.rehab.passive_mode.reset()
+            self.rehab.controller_reset()
 
     def resistance_setup_btn_clicked(self):
         pass
@@ -714,6 +754,7 @@ class RehabApp(QMainWindow):
         if self.rehab.resistance_control_check_status != False:
             self.rehab.resistance_control_activate_status = False
             self.rehab.resistance_control_reset()
+            self.rehab.controller_reset()
     
     def assistance_setup_btn_clicked(self):
         pass
@@ -726,6 +767,7 @@ class RehabApp(QMainWindow):
         if self.rehab.assistance_control_check_status != False:
             self.rehab.assistance_control_activate_status = False
             self.rehab.resistance_control_reset()
+            self.rehab.controller_reset()
 
     def update_data(self):
         # Motor_angle = self._RMD.angle
@@ -757,37 +799,40 @@ class RehabApp(QMainWindow):
 
             # TextItem 텍스트 업데이트
         self.desired_angle_text.setText(f"Desired Angle: {Desired_angle:.2f}")
+        self.current_angle_text.setText(f"Current Angle: {Current_angle:.2f}")
 
         # TextItem 위치 조정 (필요한 경우)
         view_range = self.plot_sensor.viewRange()
         self.desired_angle_text.setPos(view_range[0][1], view_range[1][1])
+        self.current_angle_text.setPos(view_range[0][1], view_range[1][1] -20)
 
     
 
 
-# def run_node(node):
-#     rclpy.spin(node)
+def run_node(node):
+    rclpy.spin(node)
 
 def main(args=None):
     def signal_handler(sig, frame):
         print("Shutting down...")
         QApplication.quit()  # QApplication을 종료합니다.
     signal.signal(signal.SIGINT, signal_handler)
-
+    rclpy.init(args=args)
     rehab_info = Rehab()
+
+    node_thread = Thread(target=run_node, args=(rehab_info,))
     app = QApplication(sys.argv)
     
     ex = RehabApp(rehab_info)
+    node_thread.start()
+
     
 
-    # rclpy.init(args=args)
-    # sensor = Sensor()
-    # thread = Thread(target=run_node, args=(sensor,), daemon=True)
-
-    # thread.start()
-    # time.sleep(0.5)
-
     sys.exit(app.exec_())
+
+    rehab_info.destroy_node()
+    rclpy.shutdown()
+    node_thread.join()
     
     # sensor.destroy_node()
     # rclpy.shutdown()

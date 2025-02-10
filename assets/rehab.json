@@ -1,1 +1,0 @@
-{"theta_min": 30.0, "theta_max": 120.0, "dtheta_max": 30.0, "ddtheta_max": 20.0, "acc_time": 1.0, "repeatation_number": 10.0, "thruster_acc": 1.0, "hold_time": 1.0, "kp_passive": 1.0, "ki_passive": 0.0, "kd_passive": 0.1, "m_resistance": 1.0, "kp_assistance": 1.0, "ki_assistance": 0.0, "kd_assistance": 0.1}
