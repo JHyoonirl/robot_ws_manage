@@ -17,14 +17,14 @@ def generate_launch_description():
             description='USB port for motor'
             )
     
-    usb_port_sensor = DeclareLaunchArgument(
-            'usb_port_sensor', default_value='/dev/ttyUSB1',
-            description='USB port for torque sensor'
-            )
-    
     usb_port_imu = DeclareLaunchArgument(
             'usb_port_imu', default_value='/dev/ttyUSB0',
             description='USB port for imu'
+            )
+    
+    usb_port_sensor = DeclareLaunchArgument(
+            'usb_port_sensor', default_value='/dev/ttyUSB1',
+            description='USB port for torque sensor'
             )
 
     # thruster 제어하는 노드

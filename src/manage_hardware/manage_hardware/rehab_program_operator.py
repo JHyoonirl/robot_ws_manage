@@ -197,7 +197,7 @@ class Rehab(Node):
         self.RMD = RMD(0x141)
         self.RMD.setup('slcan', usb_port)
 
-        self.motor_contol_thread = threading.Thread(target=self.sensing_motor, daemon=True)
+        self.motor_contol_thread = threading.Thread(target=self.control_motor_loop, daemon=True)
 
         self.Motor_info_publisher = self.create_publisher(Float64MultiArray, 'Motor_info', self.qos_profile)
         # self.Motor_velocity_publisher = self.create_publisher(Float64, 'Motor_velocity', self.qos_profile)
@@ -210,13 +210,7 @@ class Rehab(Node):
         self.VELOCITY_LIMIT = 5000
         self.Desired_angle = 0.0
         self.control_check_status = False
-        self.position_control_check_status = False # 작동 Main Switch
-        self.sinusoidal_control_check_status = False # 작동 Main Switch
-        self.ramp_control_check_status = False # 작동 Main Switch
-        self.position_control_activate_status = False # step 작동 on/off Switch
-        self.sinusoidal_control_activate_status = False # step 작동 on/off Switch
-        self.ramp_control_activate_status = False # step 작동 on/off Switch
-        # self.neutral_angle = 0
+        self.motor_neutral_status = False
         self.neutral_torque = 0 # 중립 위치에서 발생하는 토크는?
         self.position_error = 0
 
@@ -310,7 +304,8 @@ class Rehab(Node):
     
     def motor_on(self):
         self.RMD.raw_motor_run()
-    def sensing_motor(self):
+
+    def control_motor_loop(self):
         while True:
             self.voltage, self.temperature, self.torque_current, self.velocity, self.angle, error = self.RMD.status_motor() #
             self.knee_angle = self.angle - self.Neutral_angle # encoder angle - neutral angle
@@ -366,112 +361,6 @@ class Rehab(Node):
             self.get_logger().info('{0}'.format(msg.data))
         msg.data = float(msg.data)
         self.thruster_publisher.publish(msg)
-
-    def setting_torque_sensor(self):
-        self.declare_parameter('usb_port_torque_sensor', '/dev/ttyUSB1')
-        usb_port = self.get_parameter('usb_port_torque_sensor').get_parameter_value().string_value
-        self.qos_profile = QoSProfile(depth=10)
-        # self.qos_profile = QoSProfile(history = QoSHistoryPolicy.KEEP_LAST, depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
-        self.sensor_state = False
-
-        self.sensor_data_read_thread = Thread(target=self.data_process, daemon=True)
-        self.sensor = FTSensor(port=usb_port)
-        self.init_status = self.sensor.ft_sensor_init()
-        self.decoded_force = [0, 0, 0]
-        self.decoded_torque = [0, 0, 0]
-        self.sensor_state = False
-
-        # 데이터 퍼블리싱을 위한 퍼블리셔 설정
-        self.force_publisher = self.create_publisher(Vector3, 'force_data', self.qos_profile)
-        self.torque_publisher = self.create_publisher(Vector3, 'torque_data', self.qos_profile)
-        
-        self.test_switch = False
-        self.sensor_test_msg = 3
-
-        self.data_on = False
-        self.test_bias = False
-        self.data_buffer = bytearray()
-        self.lock = threading.Lock()
-        self.packet_count = 0
-        
-        if self.init_status:
-            # self.read_thread = Thread(target=self.sensor.start_reading, daemon=True)
-            # self.process_thread = Thread(target=self.sensor.process_data, daemon=True)
-            self.sensor_data_read_thread.start()
-            self.timer = self.create_timer(0.005, self.publish_sensor)
-
-    def publish_sensor(self):
-        force_msg = Vector3()
-        torque_msg = Vector3()
-
-        # 모든 메시지에 동일한 시간 스탬프 적용
-        # if self.data_on and self.decoded_force != None and self.decoded_torque != None:
-            # 데이터 할당
-        force_msg.x =float(self.decoded_force[0])
-        force_msg.y =float(self.decoded_force[1])
-        force_msg.z =float(self.decoded_force[2])
-        torque_msg.x =float(self.decoded_torque[0])
-        torque_msg.y =float(self.decoded_torque[1])
-        torque_msg.z =float(self.decoded_torque[2])
-        
-        # 데이터 발행
-        self.force_publisher.publish(force_msg)
-        self.torque_publisher.publish(torque_msg)
-    
-    def data_process(self):
-        while True:
-            if self.sensor_state:
-                try:
-                    self.decoded_force, self.decoded_torque = self.sensor.ft_sensor_continuous_data_read()
-                except Exception as e:
-                    print(f"Error: {e}")
-
-    def start_reading(self):
-        # next_reading_time = time.time()
-        while True:
-            self.next_process_time = time.time()
-            data = self.sensor.sensor.read(50)  # 16바이트 데이터 읽기
-            # print(data)
-            with self.lock:
-                self.data_buffer.extend(data)
-             # 다음 데이터 처리 시간을 기다립니다.
-            self.next_process_time += 0.005
-            sleep_time = self.next_process_time - time.time()
-            # if sleep_time > 0:
-                # time.sleep(sleep_time)
-                
-    def process_data(self):
-        while True:
-            with self.lock:
-                if len(self.data_buffer) >= 16:
-                    if self.data_buffer[0] == 0x0B:
-                        packet = self.data_buffer[:16]
-                        self.decoded_force, self.decoded_torque = self.sensor.decode_received_data(packet[1:13])
-                        self.packet_count += 1
-                        self.data_buffer = self.data_buffer[16:]
-                        # now = self.get_clock().now()  # 현재 시간을 한 번만 계산
-                            
-                        # 모든 메시지 생성
-                        # time_msg = Float64()
-                        force_msg = Vector3()
-                        torque_msg = Vector3()
-
-                        # 모든 메시지에 동일한 시간 스탬프 적용
-                        # force_msg.header.stamp = now.to_msg()
-                        # torque_msg.header.stamp = now.to_msg()
-                        # time_msg.data = float(now.nanoseconds) / 1e9  # 나노초를 초로 변환
-                        if self.data_on and self.decoded_force != None and self.decoded_torque != None:
-                            # 데이터 할당
-                            force_msg.x, force_msg.y, force_msg.z = self.decoded_force[:]
-                            torque_msg.x, torque_msg.y, torque_msg.z = self.decoded_torque[:]
-                            
-                            # 데이터 발행
-                            self.force_publisher.publish(force_msg)
-                            self.torque_publisher.publish(torque_msg)
-                            # self.sensor_time.publish(time_msg)
-                        time.sleep(0.0005)
-                    else:
-                        self.data_buffer.pop(0)
 
     def PID_Controller(self, desired_angle, current_angle, integral_error, last_error, p, i, d, past_time):
         dt = time.time() - past_time
@@ -587,18 +476,21 @@ class RehabApp(QMainWindow):
         self.resistance_checkbox = self.findChild(QCheckBox, 'resistance_checkbox')
         self.assistance_checkbox = self.findChild(QCheckBox, 'assistance_checkbox')
         self.muscle_component_checkbox = self.findChild(QCheckBox, 'muscle_component_checkbox')
+        self.motor_neutral_angle_checkbox = self.findChild(QCheckBox, 'motor_neutral_angle')
 
         
         self.passive_checkbox.setDisabled(True)
         self.resistance_checkbox.setDisabled(True)
         self.assistance_checkbox.setDisabled(True)
         self.muscle_component_checkbox.setDisabled(True)
+        self.motor_neutral_angle_checkbox.setDisabled(True)
 
         self.control_checkbox.stateChanged.connect(self.control_on_off_changed)
         self.passive_checkbox.stateChanged.connect(self.passive_control_checked)
         self.resistance_checkbox.stateChanged.connect(self.resistance_control_checked)
         self.assistance_checkbox.stateChanged.connect(self.assistance_control_checked)
         self.muscle_component_checkbox.stateChanged.connect(self.muscle_component_control_checked)
+        self.motor_neutral_angle_checkbox.stateChanged.connect(self.motor_neutral_angle_checked)
 
         self.btn_off()
 
@@ -725,6 +617,12 @@ class RehabApp(QMainWindow):
             self.btn_off()
 
     def muscle_component_control_checked(self, state):
+        if state == Qt.Checked:
+            self.rehab.muscle_componenet_control_activate_status = True
+        else:
+            self.rehab.muscle_componenet_control_activate_status = False
+
+    def motor_neutral_angle_checked(self, state):
         if state == Qt.Checked:
             self.rehab.muscle_componenet_control_activate_status = True
         else:
