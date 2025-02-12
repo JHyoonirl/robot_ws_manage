@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>696</width>
-    <height>655</height>
+    <width>185</width>
+    <height>237</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -17,8 +17,8 @@
    <widget class="QPushButton" name="Setbias">
     <property name="geometry">
      <rect>
-      <x>50</x>
-      <y>490</y>
+      <x>20</x>
+      <y>70</y>
       <width>141</width>
       <height>31</height>
      </rect>
@@ -30,8 +30,8 @@
    <widget class="QPushButton" name="Setstart">
     <property name="geometry">
      <rect>
-      <x>50</x>
-      <y>530</y>
+      <x>20</x>
+      <y>110</y>
       <width>141</width>
       <height>31</height>
      </rect>
@@ -43,8 +43,8 @@
    <widget class="QPushButton" name="Setstop">
     <property name="geometry">
      <rect>
-      <x>50</x>
-      <y>570</y>
+      <x>20</x>
+      <y>150</y>
       <width>141</width>
       <height>31</height>
      </rect>
@@ -53,223 +53,11 @@
      <string>Set Stop</string>
     </property>
    </widget>
-   <widget class="QLabel" name="force_x_data">
-    <property name="geometry">
-     <rect>
-      <x>240</x>
-      <y>520</y>
-      <width>81</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>TextLabel</string>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-    </property>
-   </widget>
-   <widget class="QLabel" name="ForceX">
-    <property name="geometry">
-     <rect>
-      <x>240</x>
-      <y>500</y>
-      <width>81</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Force x</string>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignCenter</set>
-    </property>
-   </widget>
-   <widget class="QLabel" name="ForceY">
-    <property name="geometry">
-     <rect>
-      <x>380</x>
-      <y>500</y>
-      <width>81</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Force y</string>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignCenter</set>
-    </property>
-   </widget>
-   <widget class="QLabel" name="force_y_data">
-    <property name="geometry">
-     <rect>
-      <x>380</x>
-      <y>520</y>
-      <width>81</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>TextLabel</string>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-    </property>
-   </widget>
-   <widget class="QLabel" name="force_z_data">
-    <property name="geometry">
-     <rect>
-      <x>500</x>
-      <y>520</y>
-      <width>81</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>TextLabel</string>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-    </property>
-   </widget>
-   <widget class="QLabel" name="ForceZ">
-    <property name="geometry">
-     <rect>
-      <x>500</x>
-      <y>500</y>
-      <width>81</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Force z</string>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignCenter</set>
-    </property>
-   </widget>
-   <widget class="QLabel" name="TorqueX">
-    <property name="geometry">
-     <rect>
-      <x>240</x>
-      <y>550</y>
-      <width>81</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Torque x</string>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignCenter</set>
-    </property>
-   </widget>
-   <widget class="QLabel" name="torque_y_data">
-    <property name="geometry">
-     <rect>
-      <x>380</x>
-      <y>570</y>
-      <width>81</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Force x</string>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-    </property>
-   </widget>
-   <widget class="QLabel" name="torque_x_data">
-    <property name="geometry">
-     <rect>
-      <x>240</x>
-      <y>570</y>
-      <width>81</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Force x</string>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-    </property>
-   </widget>
-   <widget class="QLabel" name="TorqueZ">
-    <property name="geometry">
-     <rect>
-      <x>500</x>
-      <y>550</y>
-      <width>81</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Torque z</string>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignCenter</set>
-    </property>
-   </widget>
-   <widget class="QLabel" name="torque_z_data">
-    <property name="geometry">
-     <rect>
-      <x>500</x>
-      <y>570</y>
-      <width>81</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Force x</string>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-    </property>
-   </widget>
-   <widget class="QLabel" name="TorqueY">
-    <property name="geometry">
-     <rect>
-      <x>380</x>
-      <y>550</y>
-      <width>81</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Torque y</string>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignCenter</set>
-    </property>
-   </widget>
-   <widget class="PlotWidget" name="plot_force" native="true">
-    <property name="geometry">
-     <rect>
-      <x>50</x>
-      <y>60</y>
-      <width>591</width>
-      <height>201</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="PlotWidget" name="plot_torque" native="true">
-    <property name="geometry">
-     <rect>
-      <x>50</x>
-      <y>270</y>
-      <width>591</width>
-      <height>201</height>
-     </rect>
-    </property>
-   </widget>
    <widget class="QPushButton" name="Quit">
     <property name="geometry">
      <rect>
-      <x>500</x>
-      <y>20</y>
+      <x>20</x>
+      <y>30</y>
       <width>141</width>
       <height>31</height>
      </rect>
@@ -284,21 +72,13 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>696</width>
-     <height>21</height>
+     <width>185</width>
+     <height>26</height>
     </rect>
    </property>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
  </widget>
- <customwidgets>
-  <customwidget>
-   <class>PlotWidget</class>
-   <extends>QWidget</extends>
-   <header>pyqtgraph</header>
-   <container>1</container>
-  </customwidget>
- </customwidgets>
  <resources/>
  <connections/>
 </ui>
