@@ -161,6 +161,7 @@ class Motor(Node):
                 self.knee_angle = self.angle - self.Neutral_angle # encoder angle - neutral angle
                 self.motor_info = Float64MultiArray()
                 self.motor_info.data = [self.voltage, self.torque_current, self.knee_angle, self.velocity]
+                self.torque_out_info = self.torque_current
                 self.Motor_info_publisher.publish(self.motor_info)
                 # self.motor_info.data = float(self.knee_angle)
                 # self.Motor_info_publisher.publish(self.motor_info)
@@ -810,7 +811,7 @@ class MotorWindow(QMainWindow):
         Motor_angle = self._RMD.angle
         Current_angle = self._RMD.knee_angle
         Desired_angle = self._RMD.Desired_angle
-        torque = self._RMD.torque_out
+        torque = self._RMD.torque_out_info
 
         velocity = self._RMD.velocity
         self.Angle_text.setText(f"{Motor_angle:.2f}")

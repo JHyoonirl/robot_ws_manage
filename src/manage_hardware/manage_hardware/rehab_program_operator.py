@@ -39,6 +39,13 @@ class Rehab(Node):
         self.dt = 0.005
         self.past_time = 0.0
         self.thruster_torque = 0
+        '''
+        Thruster에 입력하게 되는 무릎 기준 토크
+        '''
+        self.motor_torque = 0
+        '''
+        RMD motor에 입력하게 되는 모터 토크
+        '''
 
         self.input_torque_passive= 0
         self.integral_error_passive = 0
@@ -70,7 +77,7 @@ class Rehab(Node):
         self.passive_control_activate_status = False # step 작동 on/off Switch
         self.resistance_control_activate_status = False # step 작동 on/off Switch
         self.assistance_control_activate_status = False # step 작동 on/off Switch
-        self.muscle_componenet_control_activate_status = False # step 작동 on/off Switch
+        # self.muscle_componenet_control_activate_status = False # step 작동 on/off Switch
 
         self.passive_mode = Passive_mode(self)
         self.active_resist_mode = Active_Resistance_mode(self)
@@ -90,7 +97,7 @@ class Rehab(Node):
         '''
         RMD 모터 제어하고 값 Publish
         '''
-        # self.setting_motor()
+        self.setting_motor()
 
         '''
         Thruster 제어하고 값 Publish
@@ -108,8 +115,8 @@ class Rehab(Node):
         while True:
             
             if self.control_check_status == True:
-                if self.muscle_componenet_control_activate_status == True:
-                    self.get_logger().info('resistance_control : {0}'.format(self.muscle_componenet_control_activate_status))
+                # if self.muscle_componenet_control_activate_status == True:
+                #     self.get_logger().info('resistance_control : {0}'.format(self.muscle_componenet_control_activate_status))
                     
                 if self.passive_control_check_status == True and self.passive_control_activate_status == True:
                     self.offset_gravity = 2
@@ -206,13 +213,14 @@ class Rehab(Node):
         ## 모터 시계 회전(+)은 flexion
 
         self.MOTOR_ID = 1
-        self.ANGLE_INIT = 10
-        self.VELOCITY_LIMIT = 5000
-        self.Desired_angle = 0.0
-        self.control_check_status = False
+        # self.Desired_angle = 0.0
+        # self.neutral_torque = 0 # 중립 위치에서 발생하는 토크는?
+        # self.position_error = 0
+
+        self.motor_control_status = False
+        self.motor_control_activate_status = False
         self.motor_neutral_status = False
-        self.neutral_torque = 0 # 중립 위치에서 발생하는 토크는?
-        self.position_error = 0
+        self.motor_muscle_component_status = False
 
         with open("custom_json/motor_info.json", "r") as fr:
             data = json.load(fr)
@@ -231,17 +239,17 @@ class Rehab(Node):
         self.dt_sleep = 0.001
         self.past_time = time.time()
 
-        self.amplitude = 0.0
-        self.period = 0.0
-        self.pos_offset = 0.0
-        self.RMD_timer_sinusoidal = 0.0
+        # self.amplitude = 0.0
+        # self.period = 0.0
+        # self.pos_offset = 0.0
+        # self.RMD_timer_sinusoidal = 0.0
 
-        self.amplitude_ramp = 0.0 #  initial_condition
-        self.velocity_ramp = 0.0 # velocity
-        self.pos_offset_ramp = 0.0 # last_condition
-        self.RMD_timer_ramp = 0.0
-        self.state_ramp = 1 # 1: decrease 2: increase
-        self.waypoint_ramp = 0
+        # self.amplitude_ramp = 0.0 #  initial_condition
+        # self.velocity_ramp = 0.0 # velocity
+        # self.pos_offset_ramp = 0.0 # last_condition
+        # self.RMD_timer_ramp = 0.0
+        # self.state_ramp = 1 # 1: decrease 2: increase
+        # self.waypoint_ramp = 0
 
         self.voltage = 0
         self.temperature = 0
@@ -307,11 +315,34 @@ class Rehab(Node):
 
     def control_motor_loop(self):
         while True:
-            self.voltage, self.temperature, self.torque_current, self.velocity, self.angle, error = self.RMD.status_motor() #
-            self.knee_angle = self.angle - self.Neutral_angle # encoder angle - neutral angle
-            self.motor_info = Float64MultiArray()
-            self.motor_info.data = [self.voltage, self.torque_current, self.knee_angle, self.velocity]
-            self.Motor_info_publisher.publish(self.motor_info)
+            if self.motor_control_status == True:
+                if self.motor_control_activate_status == True:
+                    try:
+                        self.voltage, self.temperature, self.torque_current, self.velocity, self.angle, error = self.RMD.status_motor() #
+                        self.knee_angle = self.angle - self.Neutral_angle # encoder angle - neutral angle
+                        self.motor_info = Float64MultiArray()
+                        self.motor_info.data = [self.voltage, self.torque_current, self.knee_angle, self.velocity]
+                        self.Motor_info_publisher.publish(self.motor_info)
+                        self.get_logger().info('motor_activate: {0}'.format(self.motor_info))
+                    except Exception as e:
+                        self.get_logger().info('e: {0}'.format(e))
+
+                    if self.motor_neutral_status == True:
+                        '''
+                        PID controller를 이용해서 90도 맞추기
+                        '''
+                        self.get_logger().info('motor_neutral: {0}'.format(self.motor_info))
+
+                    if self.motor_muscle_component_status == True:
+                        '''
+                        muscle component만을 motor controller에 input으로 적용
+                        '''
+                        self.get_logger().info('muscle_component: {0}'.format(self.motor_info))
+
+            else:
+                pass
+            time.sleep(0.005)
+                
     
     
     def setting_thruster(self):
@@ -475,6 +506,7 @@ class RehabApp(QMainWindow):
         self.passive_checkbox = self.findChild(QCheckBox, 'passive_checkbox')
         self.resistance_checkbox = self.findChild(QCheckBox, 'resistance_checkbox')
         self.assistance_checkbox = self.findChild(QCheckBox, 'assistance_checkbox')
+        self.motor_control_checkbox = self.findChild(QCheckBox, 'motor_control_checkbox')
         self.muscle_component_checkbox = self.findChild(QCheckBox, 'muscle_component_checkbox')
         self.motor_neutral_angle_checkbox = self.findChild(QCheckBox, 'motor_neutral_angle')
 
@@ -482,6 +514,7 @@ class RehabApp(QMainWindow):
         self.passive_checkbox.setDisabled(True)
         self.resistance_checkbox.setDisabled(True)
         self.assistance_checkbox.setDisabled(True)
+        # self.motor_control_checkbox.setDisabled(True)
         self.muscle_component_checkbox.setDisabled(True)
         self.motor_neutral_angle_checkbox.setDisabled(True)
 
@@ -489,6 +522,7 @@ class RehabApp(QMainWindow):
         self.passive_checkbox.stateChanged.connect(self.passive_control_checked)
         self.resistance_checkbox.stateChanged.connect(self.resistance_control_checked)
         self.assistance_checkbox.stateChanged.connect(self.assistance_control_checked)
+        self.motor_control_checkbox.stateChanged.connect(self.motor_control_checkbox_checked)
         self.muscle_component_checkbox.stateChanged.connect(self.muscle_component_control_checked)
         self.motor_neutral_angle_checkbox.stateChanged.connect(self.motor_neutral_angle_checked)
 
@@ -512,11 +546,13 @@ class RehabApp(QMainWindow):
         self.assistance_start_btn = self.findChild(QPushButton, 'assistance_start_btn')
         self.assistance_stop_btn = self.findChild(QPushButton, 'assistance_stop_btn')
 
-        self.sensor_bias_btn = self.findChild(QPushButton, 'sensor_bias_btn')
-        self.sensor_on_btn = self.findChild(QPushButton, 'sensor_on_btn')
-        self.sensor_off_btn = self.findChild(QPushButton, 'sensor_off_btn')
+        # self.sensor_bias_btn = self.findChild(QPushButton, 'sensor_bias_btn')
+        # self.sensor_on_btn = self.findChild(QPushButton, 'sensor_on_btn')
+        # self.sensor_off_btn = self.findChild(QPushButton, 'sensor_off_btn')
 
         self.motor_setup_btn = self.findChild(QPushButton, 'motor_setup_btn')
+        self.motor_on_btn = self.findChild(QPushButton, 'motor_on_btn')
+        self.motor_off_btn = self.findChild(QPushButton, 'motor_off_btn')
 
         self.thruster_on_btn = self.findChild(QPushButton, 'thruster_on_btn')
         self.thruster_off_btn = self.findChild(QPushButton, 'thruster_off_btn')
@@ -537,11 +573,13 @@ class RehabApp(QMainWindow):
         self.assistance_start_btn.clicked.connect(self.assistance_start_btn_clicked)
         self.assistance_stop_btn.clicked.connect(self.assistance_stop_btn_clicked)
 
-        self.sensor_bias_btn.clicked.connect(self.sensor_bias_btn_clicked)
-        self.sensor_on_btn.clicked.connect(self.sensor_on_btn_clicked)
-        self.sensor_off_btn.clicked.connect(self.sensor_off_btn_clicked)
+        # self.sensor_bias_btn.clicked.connect(self.sensor_bias_btn_clicked)
+        # self.sensor_on_btn.clicked.connect(self.sensor_on_btn_clicked)
+        # self.sensor_off_btn.clicked.connect(self.sensor_off_btn_clicked)
 
         self.motor_setup_btn.clicked.connect(self.motor_setup_btn_clicked)
+        self.motor_on_btn.clicked.connect(self.motor_on_btn_clicked)
+        self.motor_off_btn.clicked.connect(self.motor_off_btn_clicked)
 
         self.thruster_on_btn.clicked.connect(self.thruster_on_btn_clicked)
         self.thruster_off_btn.clicked.connect(self.thruster_off_btn_clicked)
@@ -557,7 +595,9 @@ class RehabApp(QMainWindow):
             self.passive_checkbox.setEnabled(True)
             self.resistance_checkbox.setEnabled(True)
             self.assistance_checkbox.setEnabled(True)
-            self.muscle_component_checkbox.setEnabled(True)
+            self.rehab.motor_control_status = True
+            self.rehab.motor_on()
+            #
             # self.btn_on()
         else:
             self.rehab.control_check_status = True
@@ -565,10 +605,13 @@ class RehabApp(QMainWindow):
             self.rehab.resistance_control_check_status = False # 작동 Main Switch
             self.rehab.assistance_control_check_status = False # 작동 Main Switch
             self.rehab.muscle_componenet_check_status = False # 작동 Main Switch
+            self.rehab.motor_control_status = False
+
             self.passive_checkbox.setDisabled(True)
             self.resistance_checkbox.setDisabled(True)
             self.assistance_checkbox.setDisabled(True)
-            self.muscle_component_checkbox.setDisabled(True)
+
+            self.rehab.motor_off()
 
     def passive_control_checked(self, state):
         # state == 0 : unchecked, state == 2 : checked
@@ -616,17 +659,39 @@ class RehabApp(QMainWindow):
         else:
             self.btn_off()
 
+    def motor_control_checkbox_checked(self, state):
+        if state == Qt.Checked:
+            self.rehab.motor_control_status = True
+            self.muscle_component_checkbox.setEnabled(True)
+            self.motor_neutral_angle_checkbox.setEnabled(True)
+            self.motor_on_btn.setEnabled(True)
+            self.motor_off_btn.setEnabled(True)
+            # self.resistance_stop_btn.setDisabled(True)
+        else:
+            self.rehab.motor_control_status = False
+            self.muscle_component_checkbox.setDisabled(True)
+            self.motor_neutral_angle_checkbox.setDisabled(True)
+            self.motor_on_btn.setDisabled(True)
+            self.motor_off_btn.setDisabled(True)
+
     def muscle_component_control_checked(self, state):
         if state == Qt.Checked:
-            self.rehab.muscle_componenet_control_activate_status = True
+            self.rehab.motor_muscle_component_status = True
+            self.rehab.motor_neutral_status = False
+            if self.rehab.motor_neutral_status == False and self.motor_neutral_angle_checkbox.checkState() == 2:
+                self.motor_neutral_angle_checkbox.toggle()
+
         else:
-            self.rehab.muscle_componenet_control_activate_status = False
+            self.rehab.motor_muscle_component_status = False
 
     def motor_neutral_angle_checked(self, state):
         if state == Qt.Checked:
-            self.rehab.muscle_componenet_control_activate_status = True
+            self.rehab.motor_neutral_status = True
+            self.rehab.motor_muscle_component_status = False
+            if self.rehab.motor_muscle_component_status == False and self.muscle_component_checkbox.checkState() == 2:
+                self.muscle_component_checkbox.toggle()
         else:
-            self.rehab.muscle_componenet_control_activate_status = False
+            self.rehab.motor_neutral_status = False
 
     def passive_btn_on(self):
 
@@ -722,6 +787,16 @@ class RehabApp(QMainWindow):
         except Exception as e:
             print(f"motor setup failed! {e}")
 
+    def motor_on_btn_clicked(self):
+        self.rehab.motor_control_activate_status = True
+        self.rehab.motor_on()
+        # time.sleep(0.001)
+
+    def motor_off_btn_clicked(self):
+        self.rehab.motor_control_activate_status = False
+        self.rehab.motor_off()
+        # time.sleep(0.001)
+
     def setup_btn_clicked(self):
         ThetaMin = self.ThetaMin.value()
         ThetaMax = self.ThetaMax.value()
@@ -765,15 +840,6 @@ class RehabApp(QMainWindow):
             print(f"Rehabilitation setup successful!")
         except Exception as e:
             print(f"Rehabilitation setup failed! {e}")
-
-    def sensor_bias_btn_clicked(self):
-        pass
-
-    def sensor_on_btn_clicked(self):
-        pass
-    
-    def sensor_off_btn_clicked(self):
-        pass
 
     def thruster_on_btn_clicked(self):
         self.rehab.thruster_response = True
