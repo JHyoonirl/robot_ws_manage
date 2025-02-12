@@ -9,7 +9,8 @@ import math
 from thruster_torque_converter import thruster_converter
 from passive_program import Passive_mode
 from RMD_custom import RMD# 가정한 모듈과 클래스 이름
-from FT_SENSOR_jh import FTSensor
+# from FT_SENSOR_jh import FTSensor
+from Muscle import Muscle
 
 import time
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QPushButton, QVBoxLayout, QSpinBox, QLabel, QDoubleSpinBox, QCheckBox
@@ -27,6 +28,8 @@ import json
 class Rehab(Node):
     def __init__(self):
         super().__init__('rehab_program_operator')
+
+        self.muscle_passive = Muscle()
         
         self.load_from_json()
 
@@ -92,7 +95,12 @@ class Rehab(Node):
         '''
         IMU 값 가져오기
         '''
+        self.knee_data_time = time.time()
+        self.knee_angle = 0
+        self.knee_velocity = 0.0
+        self.knee_acceleration = 0.0
         self.read_imu()
+        
 
         '''
         RMD 모터 제어하고 값 Publish
@@ -115,16 +123,13 @@ class Rehab(Node):
         while True:
             
             if self.control_check_status == True:
-                # if self.muscle_componenet_control_activate_status == True:
-                #     self.get_logger().info('resistance_control : {0}'.format(self.muscle_componenet_control_activate_status))
                     
                 if self.passive_control_check_status == True and self.passive_control_activate_status == True:
-                    self.offset_gravity = 2
                     self.desired_angle, self.desired_velocity = self.passive_mode.Passive_exercise()
                     self.input_torque_passive, self.integral_error_passive, self.error_passive = self.PID_Controller(self.desired_angle * math.pi / 180, self.current_angle* math.pi / 180, self.integral_error_passive, 
                                                                                                                     self.error_passive, self.Kp_passive, self.Ki_passive, self.Kd_passive, self.past_time)
 
-                    self.input_torque_passive = self.input_torque_passive - self.offset_gravity * math.cos(self.current_angle* math.pi / 180)
+                    self.input_torque_passive = self.input_torque_passive
 
                     self.thruster_torque = self.input_torque_passive
                     self.get_logger().info('passive_control : {0}'.format(self.thruster_torque))
@@ -196,6 +201,10 @@ class Rehab(Node):
         
     def imu_to_knee_angle(self, msg):
         self.current_angle = float( - msg.x) + 90
+        # self.knee_velocity = 0.0
+        '''
+        수정해야 함.
+        '''
 
     def setting_motor(self):
         self.declare_parameter('usb_port_motor', '/dev/ttyACM0')
@@ -337,18 +346,14 @@ class Rehab(Node):
                         '''
                         muscle component만을 motor controller에 input으로 적용
                         '''
+                        self.passive_muscle_torque = self.muscle_passive.M_passive(self.knee_angle, self.knee_velocity)
                         self.get_logger().info('muscle_component: {0}'.format(self.motor_info))
 
             else:
                 pass
             time.sleep(0.005)
-                
-    
-    
+
     def setting_thruster(self):
-        # self.cli = self.create_client(Status, 'thruster_server')
-        # while not self.cli.wait_for_service(timeout_sec=1.0):
-        #     self.get_logger().info('service not available, waiting again...')
 
         self.thruster_publisher = self.create_publisher(Float64, 'thruster_signal', self.qos_profile)
         self.thruster = 50.0  # 초기 thruster 값 설정

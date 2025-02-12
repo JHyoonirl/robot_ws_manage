@@ -25,34 +25,34 @@ class Muscle:
         '''
 
 
-    def M_stiffness(self):
+    def M_stiffness(self, angle):
         '''
         angle : Unit[deg]
         '''
-        if self.angle >= -5 and self.angle  <= 55:
-            torque = 22.5*np.exp(-0.0367*self.angle)
-        elif self.angle >= 55 and self.angle <= 95:
+        if angle >= -5 and angle  <= 55:
+            torque = 22.5*np.exp(-0.0367*angle)
+        elif angle >= 55 and angle <= 95:
             torque = -0.149*self.angle + 11.17
-        elif self.angle >= 95 and self.angle <= 155:
-            torque = -0.002*np.exp(0.0768*self.angle)
+        elif angle >= 95 and angle <= 155:
+            torque = -0.002*np.exp(0.0768*angle)
         else:
             torque = 0
             
         return torque
 
-    def M_damping(self):
+    def M_damping(self, angle, velocity):
         
         def damping_coef(angle):
             coef = 0.000213 * angle ^ 2 - 0.0266* angle + 1.583
             return coef
         
-        torque = damping_coef(self.angle) * self.velocity
+        torque = damping_coef(angle) * velocity
 
         return torque
     
-    def M_passive(self):
+    def M_passive(self, angle, velocity):
 
-        total_torque = self.M_damping() + self.M_stiffness()
+        total_torque = self.M_damping(angle, velocity) + self.M_stiffness(angle)
         return total_torque
     
     def M_active(self):
