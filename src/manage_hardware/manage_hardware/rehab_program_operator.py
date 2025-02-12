@@ -9,6 +9,7 @@ import math
 from thruster_torque_converter import thruster_converter
 from passive_program import Passive_mode
 from RMD_custom import RMD# 가정한 모듈과 클래스 이름
+from FT_SENSOR_jh import FTSensor
 
 import time
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QPushButton, QVBoxLayout, QSpinBox, QLabel, QDoubleSpinBox, QCheckBox
@@ -42,6 +43,7 @@ class Rehab(Node):
         self.input_torque_passive= 0
         self.integral_error_passive = 0
         self.error_passive = 0
+        self.smoothed_torque_passive = 0
 
         self.input_torque_resistance= 0
         self.integral_error_resistance = 0
@@ -50,6 +52,12 @@ class Rehab(Node):
         self.input_torque_assistance= 0
         self.integral_error_assistance = 0
         self.error_assistance = 0
+
+        '''
+        muscle passive component
+        '''
+
+        self.muscle_passive_component = 0
 
         '''
         운동을 진행하는 프로토콜과 관련된 method와 정보를 가지고 있는 객체
@@ -90,23 +98,34 @@ class Rehab(Node):
         '''
         self.setting_thruster()
 
+        '''
+        torque sensor 값 Publish
+
+        '''
+        # self.setting_torque_sensor()
+
     def controller(self):
         while True:
             
             if self.control_check_status == True:
                 if self.muscle_componenet_control_activate_status == True:
-                    pass
+                    self.get_logger().info('resistance_control : {0}'.format(self.muscle_componenet_control_activate_status))
+                    
                 if self.passive_control_check_status == True and self.passive_control_activate_status == True:
+                    self.offset_gravity = 2
                     self.desired_angle, self.desired_velocity = self.passive_mode.Passive_exercise()
                     self.input_torque_passive, self.integral_error_passive, self.error_passive = self.PID_Controller(self.desired_angle * math.pi / 180, self.current_angle* math.pi / 180, self.integral_error_passive, 
                                                                                                                     self.error_passive, self.Kp_passive, self.Ki_passive, self.Kd_passive, self.past_time)
+
+                    self.input_torque_passive = self.input_torque_passive - self.offset_gravity * math.cos(self.current_angle* math.pi / 180)
+
                     self.thruster_torque = self.input_torque_passive
-                    self.get_logger().info('{0}'.format(self.input_torque_passive))
+                    self.get_logger().info('passive_control : {0}'.format(self.thruster_torque))
                     # self.publish_thruster(self.input_torque_passive)
                 elif self.resistance_control_check_status == True and self.resistance_control_activate_status == True:
-                    pass
+                    self.get_logger().info('resistance_control : {0}'.format(self.thruster_torque))
                 elif self.assistance_control_check_status == True and self.assistance_control_activate_status == True:
-                    pass
+                    self.get_logger().info('assistance_control : {0}'.format(self.thruster_torque))
                 else:
                     self.thruster_torque = 0
             else:
@@ -172,12 +191,13 @@ class Rehab(Node):
         self.current_angle = float( - msg.x) + 90
 
     def setting_motor(self):
-        self.declare_parameter('usb_port', '/dev/ttyACM0')
-        usb_port = self.get_parameter('usb_port').get_parameter_value().string_value
+        self.declare_parameter('usb_port_motor', '/dev/ttyACM0')
+        usb_port = self.get_parameter('usb_port_motor').get_parameter_value().string_value
         
-
         self.RMD = RMD(0x141)
         self.RMD.setup('slcan', usb_port)
+
+        self.motor_contol_thread = threading.Thread(target=self.sensing_motor, daemon=True)
 
         self.Motor_info_publisher = self.create_publisher(Float64MultiArray, 'Motor_info', self.qos_profile)
         # self.Motor_velocity_publisher = self.create_publisher(Float64, 'Motor_velocity', self.qos_profile)
@@ -200,8 +220,34 @@ class Rehab(Node):
         self.neutral_torque = 0 # 중립 위치에서 발생하는 토크는?
         self.position_error = 0
 
+        with open("custom_json/motor_info.json", "r") as fr:
+            data = json.load(fr)
+        # print(data)
+
+        self.Kp = float(data["kp"])
+        self.Kp_tmp = 30
+        self.Ki = float(data["ki"])
+        self.Kd = float(data["kd"])
+        self.Neutral_angle = float(data["neutral_angle"]) # 무릎의 0도에 해당하는 motor encoder의 각도
         self.knee_angle = 0 # 무릎 각도 = encoder angle - self.Neutral_angle
 
+        self.pos_error = 0
+        self.pos_error_prev = 0
+        self.pos_error_integral = 0
+        self.dt_sleep = 0.001
+        self.past_time = time.time()
+
+        self.amplitude = 0.0
+        self.period = 0.0
+        self.pos_offset = 0.0
+        self.RMD_timer_sinusoidal = 0.0
+
+        self.amplitude_ramp = 0.0 #  initial_condition
+        self.velocity_ramp = 0.0 # velocity
+        self.pos_offset_ramp = 0.0 # last_condition
+        self.RMD_timer_ramp = 0.0
+        self.state_ramp = 1 # 1: decrease 2: increase
+        self.waypoint_ramp = 0
 
         self.voltage = 0
         self.temperature = 0
@@ -214,8 +260,6 @@ class Rehab(Node):
         self.torque_out = 0
         status_1 = self.init_motor()
         status_2 = self.init_acceleration()
-
-        self.motor_contol_thread = threading.Thread(target=self.sensing_motor, daemon=True)
         if status_1 == True and status_2 == True:
             self.motor_contol_thread.start()
     
@@ -264,12 +308,16 @@ class Rehab(Node):
         self.pos_error_prev = 0
         self.pos_error_integral = 0
     
+    def motor_on(self):
+        self.RMD.raw_motor_run()
     def sensing_motor(self):
-        self.voltage, self.temperature, self.torque_current, self.velocity, self.angle, error = self.RMD.status_motor() #
-        self.knee_angle = self.angle - self.Neutral_angle # encoder angle - neutral angle
-        self.motor_info = Float64MultiArray()
-        self.motor_info.data = [self.voltage, self.torque_current, self.knee_angle, self.velocity]
-        self.Motor_info_publisher.publish(self.motor_info)
+        while True:
+            self.voltage, self.temperature, self.torque_current, self.velocity, self.angle, error = self.RMD.status_motor() #
+            self.knee_angle = self.angle - self.Neutral_angle # encoder angle - neutral angle
+            self.motor_info = Float64MultiArray()
+            self.motor_info.data = [self.voltage, self.torque_current, self.knee_angle, self.velocity]
+            self.Motor_info_publisher.publish(self.motor_info)
+    
     
     def setting_thruster(self):
         # self.cli = self.create_client(Status, 'thruster_server')
@@ -292,9 +340,7 @@ class Rehab(Node):
         # try:
         future = self.cli.call_async(req)
         future.add_done_callback(self.handle_service_response)
-        
-    # 필요한 경우 리소스를 재설정하거나 복구 코드 실행
-
+   
     def handle_service_response(self, future):
         try:
             response = future.result()
@@ -320,6 +366,112 @@ class Rehab(Node):
             self.get_logger().info('{0}'.format(msg.data))
         msg.data = float(msg.data)
         self.thruster_publisher.publish(msg)
+
+    def setting_torque_sensor(self):
+        self.declare_parameter('usb_port_torque_sensor', '/dev/ttyUSB1')
+        usb_port = self.get_parameter('usb_port_torque_sensor').get_parameter_value().string_value
+        self.qos_profile = QoSProfile(depth=10)
+        # self.qos_profile = QoSProfile(history = QoSHistoryPolicy.KEEP_LAST, depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
+        self.sensor_state = False
+
+        self.sensor_data_read_thread = Thread(target=self.data_process, daemon=True)
+        self.sensor = FTSensor(port=usb_port)
+        self.init_status = self.sensor.ft_sensor_init()
+        self.decoded_force = [0, 0, 0]
+        self.decoded_torque = [0, 0, 0]
+        self.sensor_state = False
+
+        # 데이터 퍼블리싱을 위한 퍼블리셔 설정
+        self.force_publisher = self.create_publisher(Vector3, 'force_data', self.qos_profile)
+        self.torque_publisher = self.create_publisher(Vector3, 'torque_data', self.qos_profile)
+        
+        self.test_switch = False
+        self.sensor_test_msg = 3
+
+        self.data_on = False
+        self.test_bias = False
+        self.data_buffer = bytearray()
+        self.lock = threading.Lock()
+        self.packet_count = 0
+        
+        if self.init_status:
+            # self.read_thread = Thread(target=self.sensor.start_reading, daemon=True)
+            # self.process_thread = Thread(target=self.sensor.process_data, daemon=True)
+            self.sensor_data_read_thread.start()
+            self.timer = self.create_timer(0.005, self.publish_sensor)
+
+    def publish_sensor(self):
+        force_msg = Vector3()
+        torque_msg = Vector3()
+
+        # 모든 메시지에 동일한 시간 스탬프 적용
+        # if self.data_on and self.decoded_force != None and self.decoded_torque != None:
+            # 데이터 할당
+        force_msg.x =float(self.decoded_force[0])
+        force_msg.y =float(self.decoded_force[1])
+        force_msg.z =float(self.decoded_force[2])
+        torque_msg.x =float(self.decoded_torque[0])
+        torque_msg.y =float(self.decoded_torque[1])
+        torque_msg.z =float(self.decoded_torque[2])
+        
+        # 데이터 발행
+        self.force_publisher.publish(force_msg)
+        self.torque_publisher.publish(torque_msg)
+    
+    def data_process(self):
+        while True:
+            if self.sensor_state:
+                try:
+                    self.decoded_force, self.decoded_torque = self.sensor.ft_sensor_continuous_data_read()
+                except Exception as e:
+                    print(f"Error: {e}")
+
+    def start_reading(self):
+        # next_reading_time = time.time()
+        while True:
+            self.next_process_time = time.time()
+            data = self.sensor.sensor.read(50)  # 16바이트 데이터 읽기
+            # print(data)
+            with self.lock:
+                self.data_buffer.extend(data)
+             # 다음 데이터 처리 시간을 기다립니다.
+            self.next_process_time += 0.005
+            sleep_time = self.next_process_time - time.time()
+            # if sleep_time > 0:
+                # time.sleep(sleep_time)
+                
+    def process_data(self):
+        while True:
+            with self.lock:
+                if len(self.data_buffer) >= 16:
+                    if self.data_buffer[0] == 0x0B:
+                        packet = self.data_buffer[:16]
+                        self.decoded_force, self.decoded_torque = self.sensor.decode_received_data(packet[1:13])
+                        self.packet_count += 1
+                        self.data_buffer = self.data_buffer[16:]
+                        # now = self.get_clock().now()  # 현재 시간을 한 번만 계산
+                            
+                        # 모든 메시지 생성
+                        # time_msg = Float64()
+                        force_msg = Vector3()
+                        torque_msg = Vector3()
+
+                        # 모든 메시지에 동일한 시간 스탬프 적용
+                        # force_msg.header.stamp = now.to_msg()
+                        # torque_msg.header.stamp = now.to_msg()
+                        # time_msg.data = float(now.nanoseconds) / 1e9  # 나노초를 초로 변환
+                        if self.data_on and self.decoded_force != None and self.decoded_torque != None:
+                            # 데이터 할당
+                            force_msg.x, force_msg.y, force_msg.z = self.decoded_force[:]
+                            torque_msg.x, torque_msg.y, torque_msg.z = self.decoded_torque[:]
+                            
+                            # 데이터 발행
+                            self.force_publisher.publish(force_msg)
+                            self.torque_publisher.publish(torque_msg)
+                            # self.sensor_time.publish(time_msg)
+                        time.sleep(0.0005)
+                    else:
+                        self.data_buffer.pop(0)
 
     def PID_Controller(self, desired_angle, current_angle, integral_error, last_error, p, i, d, past_time):
         dt = time.time() - past_time
@@ -366,6 +518,7 @@ class RehabApp(QMainWindow):
         self.Desired_Angle_list = []
         self.Current_Angle_list = []
         self.Speed_list = []
+        self.updata_period = 20
 
         self.ui = uic.loadUi('UI/rehab.ui', self)
         self.init_ui()
@@ -504,7 +657,7 @@ class RehabApp(QMainWindow):
         ### 타이머 설정 ###
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_data)
-        self.timer.start(5)  # 100ms 간격으로 업데이트  
+        self.timer.start(self.updata_period)  # 100ms 간격으로 업데이트  
 
     def control_on_off_changed(self, state):
         if state == Qt.Checked:
@@ -573,9 +726,9 @@ class RehabApp(QMainWindow):
 
     def muscle_component_control_checked(self, state):
         if state == Qt.Checked:
-            self.rehab.muscle_componenet_check_status = True
+            self.rehab.muscle_componenet_control_activate_status = True
         else:
-            self.rehab.muscle_componenet_check_status = False
+            self.rehab.muscle_componenet_control_activate_status = False
 
     def passive_btn_on(self):
 

@@ -170,7 +170,7 @@ class SensorApp(QMainWindow):
         ### 타이머 설정 ###
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_data)
-        # self.timer.start(5)  # 100ms 간격으로 업데이트
+        self.timer.start(5)  # 100ms 간격으로 업데이트
         
         # 버튼 위젯 찾기
         self.btn_bias = self.findChild(QPushButton, 'Setbias')

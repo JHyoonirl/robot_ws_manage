@@ -799,6 +799,19 @@
      <string>OFF</string>
     </property>
    </widget>
+   <widget class="QCheckBox" name="motor_neutral_angle">
+    <property name="geometry">
+     <rect>
+      <x>710</x>
+      <y>500</y>
+      <width>151</width>
+      <height>21</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Motor Neutral Angle</string>
+    </property>
+   </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">

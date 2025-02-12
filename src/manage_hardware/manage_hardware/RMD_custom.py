@@ -195,7 +195,7 @@ class RMD:
         """
         message = [0x9A, 0x00, 0x00, 0x00,
                     0x00, 0x00, 0x00, 0x00]
-        return self.send_cmd(message, 0.0005)
+        return self.send_cmd(message, 0.001)
 
     def raw_read_motor_status_2(self):
         """
@@ -208,7 +208,7 @@ class RMD:
         """
         message = [0x9C, 0x00, 0x00, 0x00,
                     0x00, 0x00, 0x00, 0x00]
-        return self.send_cmd(message, 0.0005)
+        return self.send_cmd(message, 0.001)
     
     def read_multi_turns_angle(self):
         data = self.raw_read_multi_turns_angle().data
@@ -226,7 +226,7 @@ class RMD:
         """
         message = [0x92, 0x00, 0x00, 0x00,
                     0x00, 0x00, 0x00, 0x00]
-        return self.send_cmd(message, 0.0005)
+        return self.send_cmd(message, 0.001)
     
     def raw_motor_brake_release(self):
         """
@@ -239,7 +239,7 @@ class RMD:
         """
         message = [0x77, 0x00, 0x00, 0x00,
                     0x00, 0x00, 0x00, 0x00]
-        return self.send_cmd(message, 0.0005)
+        return self.send_cmd(message, 0.001)
     
     def raw_motor_brake_lock(self):
         """
@@ -252,7 +252,7 @@ class RMD:
         """
         message = [0x78, 0x00, 0x00, 0x00,
                     0x00, 0x00, 0x00, 0x00]
-        return self.send_cmd(message, 0.0005)
+        return self.send_cmd(message, 0.001)
 
     def raw_motor_off(self):
         """
@@ -265,7 +265,7 @@ class RMD:
         """
         message = [0x80, 0x00, 0x00, 0x00,
                     0x00, 0x00, 0x00, 0x00]
-        return self.send_cmd(message, 0.0005)
+        return self.send_cmd(message, 0.001)
 
     def raw_motor_stop(self):
         """
@@ -278,7 +278,7 @@ class RMD:
         """
         message = [0x81, 0x00, 0x00, 0x00,
                     0x00, 0x00, 0x00, 0x00]
-        return self.send_cmd(message, 0.0005)
+        return self.send_cmd(message, 0.001)
     
     def raw_motor_run(self):
         """
@@ -291,7 +291,7 @@ class RMD:
         """
         message = [0x88, 0x00, 0x00, 0x00,
                     0x00, 0x00, 0x00, 0x00]
-        return self.send_cmd(message, 0.0005)
+        return self.send_cmd(message, 0.001)
     
 
     def torque_closed_loop(self, torque_input):
@@ -321,12 +321,13 @@ class RMD:
         """
         message = [0xA1, 0x00, 0x00, 0x00,
                     data[0], data[1], 0x00, 0x00]
-        return self.send_cmd(message, 0.0005)
+        return self.send_cmd(message, 0.001)
     
     def speed_closed_loop(self, speed_input):
-        torque_array = [0x00, 0x00, 0x00, 0x00]
-        torque_array[0:4] = self.byteArray(speed_input, 4)
-        data_array =  self.raw_speed_closed_loop(torque_array).data
+        speed_array = [0x00, 0x00, 0x00, 0x00]
+        speed_array[0:4] = self.byteArray(speed_input, 4)
+        print(speed_array)
+        data_array =  self.raw_speed_closed_loop(speed_array).data
         temperature = int(data_array[1])
         torque = int.from_bytes(data_array[2:4], byteorder='little', signed=True)
         speed = int.from_bytes(data_array[4:6], byteorder='little', signed=True)
@@ -349,8 +350,8 @@ class RMD:
         """
         message = [0xA2, 0x00, 0x00, 0x00,
                     data[0], data[1], data[2], data[3]]
-        return self.send_cmd(message, 0.0005)
-    333
+        return self.send_cmd(message, 0.001)
+    
 
 
     def position_closed_loop(self, angle, VELOCITY_LIMIT):
@@ -378,7 +379,7 @@ class RMD:
         """
         message = [0xA4, 0x00, data[0], data[1],
                     data[2], data[3], data[4], data[5]]
-        return self.send_cmd(message, 0.0005)
+        return self.send_cmd(message, 0.001)
 
     
     def byteArray(self, data, size):

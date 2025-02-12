@@ -12,8 +12,13 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
    
+#     usb_port_imu = DeclareLaunchArgument(
+#             'usb_port_imu', default_value='/dev/ttyUSB1',
+#             description='USB port for imu'
+#             )
+    
     usb_port_sensor = DeclareLaunchArgument(
-            'usb_port_sensor', default_value='/dev/ttyUSB0',
+            'usb_port_sensor', default_value='/dev/ttyUSB1',
             description='USB port for FT sensor'
             )
     
@@ -23,11 +28,11 @@ def generate_launch_description():
             )
 
     # thruster 제어하는 노드
-    thruster_operator = Node(
-            package='manage_hardware',
-            executable='thruster_operator',
-            name='thruster_operator',
-            output='screen')
+#     thruster_operator = Node(
+#             package='manage_hardware',
+#             executable='thruster_operator',
+#             name='thruster_operator',
+#             output='screen')
     
     # sensor 불러오는 노드
     sensor_operator = Node(
@@ -63,7 +68,6 @@ def generate_launch_description():
         usb_port_motor,
         sensor_operator,
         rmd_operator,
-        data_save,
-        thruster_operator
+        data_save
         
     ])

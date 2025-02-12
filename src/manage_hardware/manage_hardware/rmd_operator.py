@@ -86,10 +86,11 @@ class Motor(Node):
         self.dt_sleep = 0.001
         self.past_time = time.time()
 
-        self.amplitude = 0.0
-        self.period = 0.0
-        self.pos_offset = 0.0
-        self.RMD_timer_sinusoidal = 0.0
+        self.amplitude_sine = 0.0
+        self.period_sine = 0.0
+        self.pos_offset_sine = 0.0
+        self.RMD_timer_sine= 0.0
+        self.state_sine = 1
 
         self.amplitude_ramp = 0.0 #  initial_condition
         self.velocity_ramp = 0.0 # velocity
@@ -146,7 +147,7 @@ class Motor(Node):
             response = self.RMD.read_acceleration(index)
             data = response.data
             acc = int.from_bytes(data[4:8], byteorder='little', signed=True)
-            input_acc = self.RMD.byteArray(20000, 4)
+            input_acc = self.RMD.byteArray(40000, 4)
             self.RMD.write_acceleration(index, input_acc)
         print('initialized Motor acc')
         return True
@@ -173,8 +174,14 @@ class Motor(Node):
                     # if self.position_control_activate_status == True: #제어 활성화
                     self.motor_step()
                 elif self.sinusoidal_control_check_status == True and self.sinusoidal_control_activate_status == True: # sine 제어 가능
+                    '''
+                    acceleration 
+                    '''
                     self.motor_sine()
                 elif self.ramp_control_check_status == True and self.ramp_control_activate_status == True: # sine 제어 가능
+                    '''
+                    velocity 
+                    '''
                     self.motor_ramp()
                 else:
                     self.motor_off()
@@ -228,37 +235,97 @@ class Motor(Node):
 
     def motor_sine(self):
         try:
-            self.dt = time.time() - self.past_time
-            sine_time = time.time() - self.RMD_timer_sinusoidal
-            self.Desired_angle = self.amplitude * math.sin(self.period * sine_time) + self.pos_offset
+            '''
+            # self.dt = time.time() - self.past_time
+            # sine_time = time.time() - self.RMD_timer_sinusoidal
+            # self.Desired_angle = self.amplitude * math.sin(self.period * sine_time) + self.pos_offset
 
-            self.pos_error = self.Desired_angle - self.knee_angle
-            print(self.pos_error)
+            # self.pos_error = self.Desired_angle - self.knee_angle
+            # print(self.pos_error)
 
-            # Proportional term
-            proportional = self.Kp * self.pos_error
+            # # Proportional term
+            # proportional = self.Kp * self.pos_error
 
-            # Integral term
-            self.pos_error_integral += self.pos_error * self.dt
-            integral = self.Ki * self.pos_error_integral
+            # # Integral term
+            # self.pos_error_integral += self.pos_error * self.dt
+            # integral = self.Ki * self.pos_error_integral
 
-            # Derivative term
-            derivative = self.Kd * (self.pos_error - self.pos_error_prev) / self.dt
+            # # Derivative term
+            # derivative = self.Kd * (self.pos_error - self.pos_error_prev) / self.dt
 
-            # Update previous error
-            self.pos_error_prev = self.pos_error
+            # # Update previous error
+            # self.pos_error_prev = self.pos_error
 
-            # Calculate the control output
-            output = proportional + integral + derivative
-            if abs(output) > self.torque_threshold:
-                if output > 0:
-                    output = self.torque_threshold
-                elif output < 0:
-                    output = - self.torque_threshold
-            self.torque_out = output
-            temperature, torque, speed, angle = self.RMD.torque_closed_loop(int(output))
+            # # Calculate the control output
+            # output = proportional + integral + derivative
+            # if abs(output) > self.torque_threshold:
+            #     if output > 0:
+            #         output = self.torque_threshold
+            #     elif output < 0:
+            #         output = - self.torque_threshold
+            # self.torque_out = output
+            # temperature, torque, speed, angle = self.RMD.torque_closed_loop(int(output))
             # self.get_logger().info('rmd torque, speed, angle: {0}'.format(torque, speed, angle))
-                        
+            '''
+            self.dt = time.time() - self.past_time
+            sine_time = time.time() - self.RMD_timer_sine
+            if sine_time < 3:
+                sine_time = 0
+
+
+                self.Desired_angle = self.amplitude_sine
+
+                if self.Desired_angle < self.pos_offset_sine:
+                    self.Desired_angle = self.pos_offset_sine
+
+                
+                self.get_logger().info('rself.state_sine: {0}'.format(self.state_sine))
+
+                self.pos_error = self.Desired_angle - self.knee_angle
+                # print(self.pos_error)
+
+                if sine_time < 3:
+                    proportional = self.Kp_tmp * self.pos_error
+                else:
+                    proportional = self.Kp * self.pos_error
+                
+
+                # Integral term
+                self.pos_error_integral += self.pos_error * self.dt
+                integral = self.Ki * self.pos_error_integral
+
+                # Derivative term
+                derivative = self.Kd * (self.pos_error - self.pos_error_prev) / self.dt
+
+                # Update previous error
+                self.pos_error_prev = self.pos_error
+
+                # Calculate the control output
+                output = proportional + integral + derivative
+                self.torque_out = output
+                if abs(output) > self.torque_threshold:
+                    if output > 0:
+                        output = self.torque_threshold
+                    elif output < 0:
+                        output = - self.torque_threshold
+    
+                temperature, torque, speed, angle = self.RMD.torque_closed_loop(int(output))
+            elif sine_time > 3:
+                sine_time = sine_time - 3
+                torque = - 100* self.period_sine
+                '''
+                1 torque : 1 A
+                '''
+                if self.knee_angle < self.pos_offset_sine:
+                    self.state_sine = 2
+                
+                if self.knee_angle > self.pos_offset_ramp and self.state_sine ==1:
+                    _a = self.RMD.torque_closed_loop(int(torque))
+                    self.get_logger().info('rself.state_ramp: {0}'.format(_a))
+                    
+                elif self.state_sine == 2:
+                    _a = self.RMD.torque_closed_loop(int(0))
+                     
 
         except Exception as e:
             print(f'Error3: {e}')
@@ -285,47 +352,73 @@ class Motor(Node):
             ramp_time = time.time() - self.RMD_timer_ramp
             if ramp_time < 3:
                 ramp_time = 0
-            else:
-                ramp_time = ramp_time - 3
-            sign = -1
 
-            self.Desired_angle = self.amplitude_ramp + sign * self.velocity_ramp * (ramp_time)
 
-            if self.Desired_angle < self.pos_offset_ramp:
-                self.Desired_angle = self.pos_offset_ramp
+                self.Desired_angle = self.amplitude_ramp
+
+                if self.Desired_angle < self.pos_offset_ramp:
+                    self.Desired_angle = self.pos_offset_ramp
+
+                
+                
+
+                self.pos_error = self.Desired_angle - self.knee_angle
+                # print(self.pos_error)
+
+                if ramp_time < 3:
+                    proportional = self.Kp_tmp * self.pos_error
+                else:
+                    proportional = self.Kp * self.pos_error
+                
+
+                # Integral term
+                self.pos_error_integral += self.pos_error * self.dt
+                integral = self.Ki * self.pos_error_integral
+
+                # Derivative term
+                derivative = self.Kd * (self.pos_error - self.pos_error_prev) / self.dt
+
+                # Update previous error
+                self.pos_error_prev = self.pos_error
+
+                # Calculate the control output
+                output = proportional + integral + derivative
+                self.torque_out = output
+                if abs(output) > self.torque_threshold:
+                    if output > 0:
+                        output = self.torque_threshold
+                    elif output < 0:
+                        output = - self.torque_threshold
+    
+                temperature, torque, speed, angle = self.RMD.torque_closed_loop(int(output))
+                
+
+
+            elif ramp_time > 3:
+                try:
+                    ramp_time = ramp_time - 3
+                    # print(ramp_time)
+                    velocity = - 100*self.velocity_ramp
+                    '''
+                    1 velocity : 1 deg/s
+                    '''
+                    if self.knee_angle < self.pos_offset_ramp:
+                        self.state_ramp = 2
+                    
+                    if self.knee_angle > self.pos_offset_ramp and self.state_ramp ==1:
+                        _a = self.RMD.speed_closed_loop(int(velocity))
+                        
+                        
+                        
+                    elif self.state_ramp ==2:
+                        _a = self.RMD.speed_closed_loop(int(0))
+                        
+                except Exception as e:
+                    print(f'Error3: {e}')
+
+            # sign = -1
 
             
-            self.get_logger().info('rself.state_ramp: {0}'.format(self.state_ramp))
-
-            self.pos_error = self.Desired_angle - self.knee_angle
-            # print(self.pos_error)
-
-            if ramp_time < 3:
-                proportional = self.Kp_tmp * self.pos_error
-            else:
-                proportional = self.Kp * self.pos_error
-            
-
-            # Integral term
-            self.pos_error_integral += self.pos_error * self.dt
-            integral = self.Ki * self.pos_error_integral
-
-            # Derivative term
-            derivative = self.Kd * (self.pos_error - self.pos_error_prev) / self.dt
-
-            # Update previous error
-            self.pos_error_prev = self.pos_error
-
-            # Calculate the control output
-            output = proportional + integral + derivative
-            self.torque_out = output
-            if abs(output) > self.torque_threshold:
-                if output > 0:
-                    output = self.torque_threshold
-                elif output < 0:
-                    output = - self.torque_threshold
- 
-            temperature, torque, speed, angle = self.RMD.torque_closed_loop(int(output))
             # self.get_logger().info('rmd torque, speed, angle: {0}'.format(torque, speed, angle))
                         
 
@@ -537,9 +630,9 @@ class MotorWindow(QMainWindow):
             period = self.period.toPlainText()
             pos_offset = self.pos_offset.toPlainText()
             try:
-                self._RMD.amplitude = float(amplitude)
-                self._RMD.period = float(period)
-                self._RMD.pos_offset = float(pos_offset)
+                self._RMD.amplitude_sine = float(amplitude)
+                self._RMD.period_sine = float(period)
+                self._RMD.pos_offset_sine = float(pos_offset)
             except Exception as e:
                 print(f"Error: {e}")
             except Exception as e:
@@ -549,11 +642,13 @@ class MotorWindow(QMainWindow):
     def sinusoidal_start_btn_clicked(self):
         if self._RMD.sinusoidal_control_check_status != False:
             self._RMD.sinusoidal_control_activate_status = True
-            self._RMD.RMD_timer_sinusoidal = time.time()
+            self._RMD.RMD_timer_sine = time.time()
+            self._RMD.state_sine = 1
 
     def sinusoidal_stop_btn_clicked(self):
         if self._RMD.sinusoidal_control_check_status != False:
             self._RMD.sinusoidal_control_activate_status = False
+            self._RMD.state_sine = 1
 
     def ramp_setting_btn_clicked(self):
         if self._RMD.ramp_control_check_status != False:

@@ -17,9 +17,9 @@ class ESP32Board(Node):
         super().__init__('IMU_node')
         qos_profile = QoSProfile(depth=10)
         
-        self.declare_parameter('usb_port', '/dev/ttyUSB0')  # 기본값을 제공
+        self.declare_parameter('usb_port_imu', '/dev/ttyUSB0')  # 기본값을 제공
 
-        usb_port = self.get_parameter('usb_port').get_parameter_value().string_value
+        usb_port = self.get_parameter('usb_port_imu').get_parameter_value().string_value
         
         ser = serial.Serial(
             port = usb_port,
@@ -84,7 +84,7 @@ class ESP32Board(Node):
                 imu_data.z = float(data)
         
         self.i2c_write.publish(imu_data)
-        self.get_logger().info("IMU read: {0}".format(imu_data))
+        # self.get_logger().info("IMU read: {0}".format(imu_data))
         
         
     # -------------  공통 사용 함수 정의 -----------
