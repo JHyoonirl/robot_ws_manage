@@ -60,7 +60,7 @@ class ESP32Board(Node):
         
         self.esp_serial()
         if self.status:
-            self.create_timer(0.005, self.publish_Imu)
+            self.create_timer(0.001, self.publish_Imu)
             # self.create_timer(0.005, self.publish_etc_data)
 
 
@@ -74,7 +74,7 @@ class ESP32Board(Node):
         # raw_data_index = []
         data_list = []
         EncodeData = self.ser.readline().decode()[0:-1]
-        find_index_list = ["imu", "r", "p", "y"]    
+        find_index_list = ["i", "r", "p", "y"]    
 
         for i, find_index in enumerate(find_index_list): # index number(start with 0) / string to find out( ex: imu)
             EncodedData_indexes.append(EncodeData.find(find_index))
@@ -97,12 +97,13 @@ class ESP32Board(Node):
 
         for i, data in enumerate(self.imu_data_list):
             if i == 1:
-                imu_data.x = float(data)
+                imu_data.x = round(float(data) / 16, 3)
             elif i == 2:
-                imu_data.y = float(data)
+                imu_data.y = round(float(data) / 16, 3)
             elif i == 3:
-                imu_data.z = float(data)
-                self.current_angle = float( - imu_data.x) + 90
+                imu_data.z = round(float(data) / 16, 3)
+                self.current_angle = round(float(-imu_data.x) + 90, 3)
+
         
         
 
@@ -110,7 +111,7 @@ class ESP32Board(Node):
         acceleration = Float64()
         self.currnet_time = time.time()
 
-        time_delta = self.currnet_time - self.previous_time
+        time_delta = 0.005
         alpha = 0.3  # Smoothing factor
 
         if time_delta > 0:
@@ -127,8 +128,6 @@ class ESP32Board(Node):
             acceleration.data = self.smoothed_acceleration
 
             self.i2c_write.publish(imu_data)
-            self.imu_velocity.publish(velocity)
-            self.imu_acceleration.publish(acceleration)
 
         # 현재 각도와 시간, 속도를 이전 값으로 저장
         self.previous_angle = self.current_angle

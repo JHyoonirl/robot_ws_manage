@@ -37,6 +37,8 @@ class Rehab(Node):
 
         self.desired_angle = 0.0
         self.current_angle = 0.0
+        self.current_velocity = 0.0
+        self.current_acceleration = 0.0
         self.desired_velocity = 0
         
         self.dt = 0.005
@@ -105,7 +107,7 @@ class Rehab(Node):
         '''
         RMD 모터 제어하고 값 Publish
         '''
-        self.setting_motor()
+        # self.setting_motor()
 
         '''
         Thruster 제어하고 값 Publish
@@ -198,13 +200,29 @@ class Rehab(Node):
             self.imu_to_knee_angle,
             self.qos_profile
         )
+
+        self.imu_velocity = self.create_subscription(
+            Float64,
+            'imu_data_velocity',
+            self.imu_to_knee_velociy,
+            self.qos_profile
+        )
+
+        self.imu_acceleration = self.create_subscription(
+            Float64,
+            'imu_data_acceleration',
+            self.imu_to_knee_acceleration,
+            self.qos_profile
+        )
         
     def imu_to_knee_angle(self, msg):
         self.current_angle = float( - msg.x) + 90
-        # self.knee_velocity = 0.0
-        '''
-        수정해야 함.
-        '''
+
+    def imu_to_knee_velociy(self, msg):
+        self.current_velocity = msg.data
+
+    def imu_to_knee_acceleration(self, msg):
+        self.current_acceleration = msg.data
 
     def setting_motor(self):
         self.declare_parameter('usb_port_motor', '/dev/ttyACM0')
@@ -341,6 +359,7 @@ class Rehab(Node):
                         PID controller를 이용해서 90도 맞추기
                         '''
                         self.get_logger().info('motor_neutral: {0}'.format(self.motor_info))
+                        self.RMD.position_closed_loop(self.Neutral_angle + 90, 100)
 
                     if self.motor_muscle_component_status == True:
                         '''
@@ -442,8 +461,9 @@ class RehabApp(QMainWindow):
 
         self.Desired_Angle_list = []
         self.Current_Angle_list = []
-        self.Speed_list = []
-        self.updata_period = 20
+        self.Desired_speed_list = []
+        self.Current_speed_list = []
+        self.updata_period = 50
 
         self.ui = uic.loadUi('UI/rehab.ui', self)
         self.init_ui()
@@ -462,7 +482,9 @@ class RehabApp(QMainWindow):
         
         self.plot_current_angle = self.plot_sensor.plot(pen='r', name='current_angle')
         self.plot_desired_angle = self.plot_sensor.plot(pen='b', name='desired_angle')
-        self.plot_desired_velocity = self.plot_sensor.plot(pen='g', name='desired_angle')
+        self.plot_current_velocity = self.plot_sensor.plot(pen='r', name='desired_vel')
+        self.plot_desired_velocity = self.plot_sensor.plot(pen='g', name='desired_vel')
+        
         self.plot_torque_z = self.plot_torque.plot(pen='g', name='torque_z')
 
         self.desired_angle_text = TextItem(text="Desired Angle: 0", anchor=(1, 0), color='r')
@@ -895,6 +917,8 @@ class RehabApp(QMainWindow):
         # Motor_angle = self._RMD.angle
         Current_angle = self.rehab.current_angle
         Desired_angle = self.rehab.desired_angle
+        Current_velocity = self.rehab.current_velocity
+        current_acceleration = self.rehab.current_acceleration
         Desired_velocity = self.rehab.desired_velocity
 
         # velocity = self._RMD.velocity
@@ -908,16 +932,22 @@ class RehabApp(QMainWindow):
         # for i in range(3):
         if len(self.Desired_Angle_list) >= self.threadhold:  # 최대 threadhold개 데이터 유지
             self.Desired_Angle_list.pop(0)
-        if len(self.Speed_list) >= self.threadhold:  # 최대 threadhold개 데이터 유지
-            self.Speed_list.pop(0)
+        if len(self.Desired_speed_list) >= self.threadhold:  # 최대 threadhold개 데이터 유지
+            self.Desired_speed_list.pop(0)
+        if len(self.Current_speed_list) >= self.threadhold:
+            self.Current_speed_list.pop(0)
         if len(self.Current_Angle_list) >= self.threadhold:
             self.Current_Angle_list.pop(0)
+
         self.Desired_Angle_list.append(Desired_angle)
         self.Current_Angle_list.append(Current_angle)
-        self.Speed_list.append(Desired_velocity)
+        self.Desired_speed_list.append(Desired_velocity)
+        self.Current_speed_list.append(Current_velocity)
+        
         self.plot_current_angle.setData(self.Desired_Angle_list)
         self.plot_desired_angle.setData(self.Current_Angle_list)
-        self.plot_desired_velocity.setData(self.Speed_list)
+        self.plot_desired_velocity.setData(self.Desired_speed_list)
+        self.plot_current_velocity.setData(self.Current_speed_list)
 
             # TextItem 텍스트 업데이트
         self.desired_angle_text.setText(f"Desired Angle: {Desired_angle:.2f}")

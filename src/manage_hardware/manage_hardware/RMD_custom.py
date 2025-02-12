@@ -77,10 +77,13 @@ class RMD:
             self.bus.send(message)
             time.sleep(delay)
             received_message = self.bus.recv()
-        except:
-            traceback_message = traceback.format_exc()
-            print('error' + traceback_message)
-        return received_message
+            return received_message
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            # 에러가 발생하더라도 함수는 None을 반환하고 계속 실행됩니다.
+            return None
+
+
     
     def read_pid(self):
         """
