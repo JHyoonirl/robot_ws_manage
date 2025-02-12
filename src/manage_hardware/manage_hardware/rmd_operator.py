@@ -312,20 +312,23 @@ class Motor(Node):
     
                 temperature, torque, speed, angle = self.RMD.torque_closed_loop(int(output))
             elif sine_time > 3:
+                acc = - self.period_sine
+                vel_for_constant_acc_input = 100*(sine_time - 3)*acc
                 sine_time = sine_time - 3
-                torque = - 100* self.period_sine
+                
                 '''
-                1 torque : 1 A
+                1 torque : 1 deg /s^2
                 '''
                 if self.knee_angle < self.pos_offset_sine:
                     self.state_sine = 2
                 
                 if self.knee_angle > self.pos_offset_ramp and self.state_sine ==1:
-                    _a = self.RMD.torque_closed_loop(int(torque))
+                    _a = self.RMD.speed_closed_loop(int(vel_for_constant_acc_input))
                     self.get_logger().info('rself.state_ramp: {0}'.format(_a))
                     
                 elif self.state_sine == 2:
-                    _a = self.RMD.torque_closed_loop(int(0))
+                    _a = self.RMD.speed_closed_loop(int(0))
+                    vel_for_constant_acc_input = 0.0
                      
 
         except Exception as e:
