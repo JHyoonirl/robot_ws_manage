@@ -145,31 +145,31 @@ class SensorApp(QMainWindow):
     def init_ui(self):
 
         # plot 위젯 찾기
-        self.plot_force = self.findChild(PlotWidget, 'plot_force')
-        self.plot_torque = self.findChild(PlotWidget, 'plot_torque')
+        # self.plot_force = self.findChild(PlotWidget, 'plot_force')
+        # self.plot_torque = self.findChild(PlotWidget, 'plot_torque')
 
         
-        self.plot_force_x = self.plot_force.plot(pen='r', name='Force_x')
-        self.plot_force_y = self.plot_force.plot(pen='g', name='Force_y')
-        self.plot_force_z = self.plot_force.plot(pen='b', name='Force_z')
-        self.plot_forces = [self.plot_force_x, self.plot_force_y, self.plot_force_z]
-        self.plot_force.setTitle("Force Readings")
-        self.plot_force.setBackground("w")
-        self.plot_force.setYRange(-30, 30)
-        self.plot_force.addLegend(offset=(10, 30))
+        # self.plot_force_x = self.plot_force.plot(pen='r', name='Force_x')
+        # self.plot_force_y = self.plot_force.plot(pen='g', name='Force_y')
+        # self.plot_force_z = self.plot_force.plot(pen='b', name='Force_z')
+        # self.plot_forces = [self.plot_force_x, self.plot_force_y, self.plot_force_z]
+        # self.plot_force.setTitle("Force Readings")
+        # self.plot_force.setBackground("w")
+        # self.plot_force.setYRange(-30, 30)
+        # self.plot_force.addLegend(offset=(10, 30))
 
-        self.plot_torque_x = self.plot_torque.plot(pen='r', name='Torque_x')
-        self.plot_torque_y = self.plot_torque.plot(pen='g', name='Torque_y')
-        self.plot_torque_z = self.plot_torque.plot(pen='b', name='Torque_z')
-        self.plot_torques = [self.plot_torque_x, self.plot_torque_y, self.plot_torque_z]
-        self.plot_torque.setTitle("Torque Readings")
-        self.plot_torque.setYRange(-3, 3)
-        self.plot_torque.setBackground("w")
-        self.plot_torque.addLegend(offset=(10, 30))
+        # self.plot_torque_x = self.plot_torque.plot(pen='r', name='Torque_x')
+        # self.plot_torque_y = self.plot_torque.plot(pen='g', name='Torque_y')
+        # self.plot_torque_z = self.plot_torque.plot(pen='b', name='Torque_z')
+        # self.plot_torques = [self.plot_torque_x, self.plot_torque_y, self.plot_torque_z]
+        # self.plot_torque.setTitle("Torque Readings")
+        # self.plot_torque.setYRange(-3, 3)
+        # self.plot_torque.setBackground("w")
+        # self.plot_torque.addLegend(offset=(10, 30))
 
-        ### 타이머 설정 ###
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.update_data)
+        # ### 타이머 설정 ###
+        # self.timer = QTimer(self)
+        # self.timer.timeout.connect(self.update_data)
         # self.timer.start(5)  # 100ms 간격으로 업데이트
         
         # 버튼 위젯 찾기
@@ -179,26 +179,26 @@ class SensorApp(QMainWindow):
         self.btn_quit = self.findChild(QPushButton, 'Quit')
 
         # 라벨 위젯 찾기
-        self.label_force_x = self.findChild(QLabel, 'ForceX')
-        self.label_torque_x = self.findChild(QLabel, 'TorqueX')
-        self.label_force_y = self.findChild(QLabel, 'ForceY')
-        self.label_torque_y = self.findChild(QLabel, 'TorqueY')
-        self.label_force_z = self.findChild(QLabel, 'ForceZ')
-        self.label_torque_z = self.findChild(QLabel, 'TorqueZ')
+        # self.label_force_x = self.findChild(QLabel, 'ForceX')
+        # self.label_torque_x = self.findChild(QLabel, 'TorqueX')
+        # self.label_force_y = self.findChild(QLabel, 'ForceY')
+        # self.label_torque_y = self.findChild(QLabel, 'TorqueY')
+        # self.label_force_z = self.findChild(QLabel, 'ForceZ')
+        # self.label_torque_z = self.findChild(QLabel, 'TorqueZ')
 
-        self.force_labels = [
-            self.findChild(QLabel, 'force_x_data'),
-            self.findChild(QLabel, 'force_y_data'),
-            self.findChild(QLabel, 'force_z_data')
-        ]
+        # self.force_labels = [
+        #     self.findChild(QLabel, 'force_x_data'),
+        #     self.findChild(QLabel, 'force_y_data'),
+        #     self.findChild(QLabel, 'force_z_data')
+        # ]
 
-        self.torque_labels = [
-            self.findChild(QLabel, 'torque_x_data'),
-            self.findChild(QLabel, 'torque_y_data'),
-            self.findChild(QLabel, 'torque_z_data')
-        ]
+        # self.torque_labels = [
+        #     self.findChild(QLabel, 'torque_x_data'),
+        #     self.findChild(QLabel, 'torque_y_data'),
+        #     self.findChild(QLabel, 'torque_z_data')
+        # ]
 
-        # 버튼 클릭 이벤트 연결
+        # # 버튼 클릭 이벤트 연결
         self.btn_bias.clicked.connect(self.set_bias)
         self.btn_start.clicked.connect(self.turn_on)
         self.btn_stop.clicked.connect(self.turn_off)

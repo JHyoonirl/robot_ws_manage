@@ -74,7 +74,7 @@ class Motor(Node):
         # print(data)
 
         self.Kp = float(data["kp"])
-        self.Kp_tmp = 30
+        self.Kp_tmp = 20
         self.Ki = float(data["ki"])
         self.Kd = float(data["kd"])
         self.Neutral_angle = float(data["neutral_angle"]) # 무릎의 0도에 해당하는 motor encoder의 각도

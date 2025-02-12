@@ -61,7 +61,7 @@ class ESP32Board(Node):
         self.esp_serial()
         if self.status:
             self.create_timer(0.005, self.publish_Imu)
-            self.create_timer(0.005, self.publish_etc_data)
+            # self.create_timer(0.005, self.publish_etc_data)
 
 
     #  --------------   Publisher def 정의 -------------
@@ -111,7 +111,7 @@ class ESP32Board(Node):
         self.currnet_time = time.time()
 
         time_delta = self.currnet_time - self.previous_time
-        alpha = 0.1  # Smoothing factor
+        alpha = 0.3  # Smoothing factor
 
         if time_delta > 0:
             # 속도 계산
@@ -125,7 +125,7 @@ class ESP32Board(Node):
             # Smoothing acceleration
             self.smoothed_acceleration = alpha * raw_acceleration + (1 - alpha) * self.smoothed_acceleration
             acceleration.data = self.smoothed_acceleration
-            
+
             self.i2c_write.publish(imu_data)
             self.imu_velocity.publish(velocity)
             self.imu_acceleration.publish(acceleration)
