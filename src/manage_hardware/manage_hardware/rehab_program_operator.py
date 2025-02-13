@@ -29,25 +29,30 @@ class Rehab(Node):
     def __init__(self):
         super().__init__('rehab_program_operator')
 
-        self.muscle_passive = Muscle()
+       
         
         self.load_from_json()
 
         self.qos_profile = QoSProfile(depth=10)
 
         self.desired_angle = 0.0
-        self.current_angle = 0.0
-        self.current_velocity = 0.0
-        self.current_acceleration = 0.0
         self.desired_velocity = 0
+
+        
+
+
+        self.motor_current_angle = 0.0
+        self.motor_current_velocity = 0.0
+        self.motor_current_acceleration = 0.0
+
         
         self.dt = 0.005
         self.past_time = 0.0
-        self.thruster_torque = 0
+        
         '''
         Thruster에 입력하게 되는 무릎 기준 토크
         '''
-        self.motor_torque = 0
+        self.thruster_torque = 0
         '''
         RMD motor에 입력하게 되는 모터 토크
         '''
@@ -69,7 +74,7 @@ class Rehab(Node):
         muscle passive component
         '''
 
-        self.muscle_passive_component = 0
+        self.muscle_passive = Muscle()
 
         '''
         운동을 진행하는 프로토콜과 관련된 method와 정보를 가지고 있는 객체
@@ -84,30 +89,24 @@ class Rehab(Node):
         self.assistance_control_activate_status = False # step 작동 on/off Switch
         # self.muscle_componenet_control_activate_status = False # step 작동 on/off Switch
 
-        self.passive_mode = Passive_mode(self)
-        self.active_resist_mode = Active_Resistance_mode(self)
-        self.active_assist_mode = Active_Assistance_mode(self)
-
-        self.controller_thread = threading.Thread(target=self.controller, daemon=True)
-
-        self.controller_thread.start()
+        
 
         
 
         '''
         IMU 값 가져오기
         '''
-        self.knee_data_time = time.time()
-        self.knee_angle = 0
-        self.knee_velocity = 0.0
-        self.knee_acceleration = 0.0
+        # self.knee_data_time = time.time()
+        self.imu_current_angle = 0.0
+        self.imu_current_velocity = 0.0
+        self.imu_current_acceleration = 0.0
         self.read_imu()
         
 
         '''
         RMD 모터 제어하고 값 Publish
         '''
-        # self.setting_motor()
+        self.setting_motor()
 
         '''
         Thruster 제어하고 값 Publish
@@ -121,14 +120,26 @@ class Rehab(Node):
         '''
         # self.setting_torque_sensor()
 
+        self.passive_mode = Passive_mode(self)
+        self.active_resist_mode = Active_Resistance_mode(self)
+        self.active_assist_mode = Active_Assistance_mode(self)
+
+        self.controller_thread = threading.Thread(target=self.controller, daemon=True)
+
+        self.controller_thread.start()
+
     def controller(self):
+
+        '''
+        thruster와 motor의 운동 루프를 분리해서 코딩했음.
+        
+        '''
         while True:
-            
             if self.control_check_status == True:
                     
                 if self.passive_control_check_status == True and self.passive_control_activate_status == True:
                     self.desired_angle, self.desired_velocity = self.passive_mode.Passive_exercise()
-                    self.input_torque_passive, self.integral_error_passive, self.error_passive = self.PID_Controller(self.desired_angle * math.pi / 180, self.current_angle* math.pi / 180, self.integral_error_passive, 
+                    self.input_torque_passive, self.integral_error_passive, self.error_passive = self.PID_Controller(self.desired_angle * math.pi / 180, self.imu_current_angle* math.pi / 180, self.integral_error_passive, 
                                                                                                                     self.error_passive, self.Kp_passive, self.Ki_passive, self.Kd_passive, self.past_time)
 
                     self.input_torque_passive = self.input_torque_passive
@@ -147,6 +158,50 @@ class Rehab(Node):
                 # pass
             self.past_time = time.time() # 따로 loop에서 진행해야 할 수 도?
             time.sleep(self.dt)
+
+    def control_motor_loop(self):
+        while True:
+            if self.motor_control_status == True:
+                if self.motor_control_activate_status == True:
+                    try:
+                        self.voltage, self.temperature, self.torque_current, self.motor_current_velocity, self.angle, error = self.RMD.status_motor() #
+                        self.motor_current_angle = self.angle - self.Neutral_angle # encoder angle - neutral angle
+
+                        self.motor_info = Float64MultiArray()
+                        self.motor_info.data = [self.voltage, self.torque_current, self.motor_current_angle, self.motor_current_velocity]
+                        self.Motor_info_publisher.publish(self.motor_info)
+                        self.get_logger().info('motor_activate: {0}'.format(self.motor_info))
+                    except Exception as e:
+                        self.get_logger().info('e: {0}'.format(e))
+
+                    if self.motor_neutral_status == True:
+                        '''
+                        PID controller를 이용해서 90도 맞추기
+                        '''
+                        self.get_logger().info('motor_neutral: {0}'.format(self.motor_info))
+                        self.RMD.position_closed_loop(self.Neutral_angle + 90, 100)
+
+                    if self.motor_muscle_component_status == True:
+                        '''
+                        muscle component만을 motor controller에 input으로 적용
+                        '''
+                        self.passive_muscle_torque = self.muscle_passive.M_passive(self.motor_current_angle, self.motor_current_velocity)
+                        self.passive_ampere_input = self.torque_ampere_ratio * self.passive_muscle_torque
+                        self.get_logger().info('muscle_component: {0}'.format(self.passive_muscle_torque))
+                        # 밑에 애 때문에 망함...
+                        _ = self.RMD.torque_closed_loop(int(self.passive_ampere_input))
+
+                    elif self.resistance_control_check_status == True and self.resistance_control_activate_status == True:
+                        
+                        self.get_logger().info('motor_resistance: {0}'.format(self.motor_info))
+
+                    elif self.assistance_control_check_status == True and self.assistance_control_activate_status == True:
+                        self.get_logger().info('motor_assistance : {0}'.format(self.thruster_torque))
+
+            else:
+                pass
+            time.sleep(self.dt)
+
     def load_from_json(self):
 
         '''
@@ -216,13 +271,13 @@ class Rehab(Node):
         )
         
     def imu_to_knee_angle(self, msg):
-        self.current_angle = float( - msg.x) + 90
+        self.imu_current_angle = float( - msg.x) + 90
 
     def imu_to_knee_velociy(self, msg):
-        self.current_velocity = msg.data
+        self.imu_current_velocity = msg.data
 
     def imu_to_knee_acceleration(self, msg):
-        self.current_acceleration = msg.data
+        self.imu_current_acceleration = msg.data
 
     def setting_motor(self):
         self.declare_parameter('usb_port_motor', '/dev/ttyACM0')
@@ -248,6 +303,12 @@ class Rehab(Node):
         self.motor_control_activate_status = False
         self.motor_neutral_status = False
         self.motor_muscle_component_status = False
+        self.torque_ampere_ratio = 892.3 / 20.36 
+        '''
+        20Nm : 8.923A
+        0.01 A : 1LSB
+        20Nm : 892.3 LSB
+        '''
 
         with open("custom_json/motor_info.json", "r") as fr:
             data = json.load(fr)
@@ -258,13 +319,13 @@ class Rehab(Node):
         self.Ki = float(data["ki"])
         self.Kd = float(data["kd"])
         self.Neutral_angle = float(data["neutral_angle"]) # 무릎의 0도에 해당하는 motor encoder의 각도
-        self.knee_angle = 0 # 무릎 각도 = encoder angle - self.Neutral_angle
+        self.motor_current_angle = 0 # 무릎 각도 = encoder angle - self.Neutral_angle
 
-        self.pos_error = 0
-        self.pos_error_prev = 0
-        self.pos_error_integral = 0
+        self.motor_pos_error = 0
+        self.motor_pos_error_prev = 0
+        self.motor_pos_error_integral = 0
         self.dt_sleep = 0.001
-        self.past_time = time.time()
+        self.motor_past_time = time.time()
 
         # self.amplitude = 0.0
         # self.period = 0.0
@@ -333,44 +394,14 @@ class Rehab(Node):
     
     def motor_off(self):
         self.RMD.raw_motor_off()
-        self.pos_error = 0
-        self.pos_error_prev = 0
-        self.pos_error_integral = 0
+        self.motor_pos_error = 0
+        self.motor_pos_error_prev = 0
+        self.motor_pos_error_integral = 0
     
     def motor_on(self):
         self.RMD.raw_motor_run()
 
-    def control_motor_loop(self):
-        while True:
-            if self.motor_control_status == True:
-                if self.motor_control_activate_status == True:
-                    try:
-                        self.voltage, self.temperature, self.torque_current, self.velocity, self.angle, error = self.RMD.status_motor() #
-                        self.knee_angle = self.angle - self.Neutral_angle # encoder angle - neutral angle
-                        self.motor_info = Float64MultiArray()
-                        self.motor_info.data = [self.voltage, self.torque_current, self.knee_angle, self.velocity]
-                        self.Motor_info_publisher.publish(self.motor_info)
-                        self.get_logger().info('motor_activate: {0}'.format(self.motor_info))
-                    except Exception as e:
-                        self.get_logger().info('e: {0}'.format(e))
-
-                    if self.motor_neutral_status == True:
-                        '''
-                        PID controller를 이용해서 90도 맞추기
-                        '''
-                        self.get_logger().info('motor_neutral: {0}'.format(self.motor_info))
-                        self.RMD.position_closed_loop(self.Neutral_angle + 90, 100)
-
-                    if self.motor_muscle_component_status == True:
-                        '''
-                        muscle component만을 motor controller에 input으로 적용
-                        '''
-                        self.passive_muscle_torque = self.muscle_passive.M_passive(self.knee_angle, self.knee_velocity)
-                        self.get_logger().info('muscle_component: {0}'.format(self.motor_info))
-
-            else:
-                pass
-            time.sleep(0.005)
+    
 
     def setting_thruster(self):
 
@@ -435,10 +466,62 @@ class Rehab(Node):
     
 class Active_Resistance_mode:
     def __init__(self, rehab):
-        pass
+        self.rehab = rehab
+        self.reset()
+
     def reset(self):
-        # self.Rehab = Rehab()
-        pass
+        self.time_stamp = 0
+
+        self.desired_position_end = 0
+        self.desired_position_start = 0
+        self.dtheta_desired_current = 0
+
+        self.desired_angle = 0
+        self.current_position = self.rehab.imu_current_angle
+        '''
+        나중에 센서값을 변경해야 함!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        
+        '''
+        self.current_velocity = 0
+
+        self.repeatation_memory = 0 
+        '''
+        짝수: Extension
+        홀수: Flexion
+        '''
+
+        self.signal = 0
+        '''
+        signal: 0(현재 state 유지), 1(Generate desired trajectory), 2(Hold position)
+        '''
+        
+        self.state = 0
+        '''
+        ## state: 0(최초 움직임), 1(Desired trajectory를 따라 움직임), 2(Holding), 3(운동 종료)
+        '''
+    def control_generator(self):
+        '''
+        resistance mode에서 시간에 따른 signal 생성
+        '''
+
+        if self.state == 0:
+            self.signal = 1
+            self.state = 1
+            self.time_stamp = time.time()
+            self.desired_angle = self.current_position
+            
+        elif self.state == 1 and abs(self.desired_position_end - self.current_position) < 2 and abs(self.current_velocity) < 0.05:
+            self.state = 2
+            self.time_stamp = time.time()
+        elif self.state == 2 and time.time() > self.time_stamp + self.rehab.holdtime:
+            self.state = 1
+            self.signal = 1
+            self.time_stamp = time.time()
+            self.repeatation_memory += 1
+        if self.repeatation_memory >= self.rehab.repeatationnumber:
+            self.state = 3
+            self.signal = 0
+
     def Active_resistance_exercise(self):
         pass
 
@@ -915,11 +998,13 @@ class RehabApp(QMainWindow):
 
     def update_data(self):
         # Motor_angle = self._RMD.angle
-        Current_angle = self.rehab.current_angle
+        
         Desired_angle = self.rehab.desired_angle
-        Current_velocity = self.rehab.current_velocity
-        current_acceleration = self.rehab.current_acceleration
         Desired_velocity = self.rehab.desired_velocity
+        Current_angle = self.rehab.imu_current_angle
+        Current_velocity = self.rehab.motor_current_velocity
+        current_acceleration = self.rehab.motor_current_acceleration
+        
 
         # velocity = self._RMD.velocity
         # self.Angle_text.setText(f"{Motor_angle:.2f}")

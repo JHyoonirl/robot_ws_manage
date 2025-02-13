@@ -14,7 +14,7 @@ class Passive_mode:
         self.dtheta_desired_current = 0
 
         self.desired_angle = 0
-        self.current_position = self.rehab.current_angle
+        self.current_position = self.rehab.imu_current_angle
         '''
         나중에 센서값을 변경해야 함!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         
@@ -26,7 +26,6 @@ class Passive_mode:
         짝수: Extension
         홀수: Flexion
         '''
-        self.protocol_start_time = 0
 
         self.signal = 0
         '''
@@ -37,8 +36,6 @@ class Passive_mode:
         '''
         ## state: 0(최초 움직임), 1(Desired trajectory를 따라 움직임), 2(Holding), 3(운동 종료)
         '''
-        
-        self.integer_init_signal = 0 # 굳이 필요한가? 추후 확인 필요
 
     def control_generator(self):
         '''
@@ -169,7 +166,7 @@ class Passive_mode:
         '''
         Passive mode 진행 프로토콜을 Main loop로 실행되는 부분
         '''
-        self.current_position = self.rehab.current_angle
+        self.current_position = self.rehab.imu_current_angle
         
         self.control_generator()
         self.desired_position_generator()

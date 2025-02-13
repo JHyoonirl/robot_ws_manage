@@ -43,7 +43,7 @@ class Muscle:
     def M_damping(self, angle, velocity):
         
         def damping_coef(angle):
-            coef = 0.000213 * angle ^ 2 - 0.0266* angle + 1.583
+            coef = 0.000213 * angle ** 2 - 0.0266* angle + 1.583
             return coef
         
         torque = damping_coef(angle) * velocity
