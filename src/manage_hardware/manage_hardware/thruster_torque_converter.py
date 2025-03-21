@@ -33,12 +33,12 @@ class thruster_converter:
 
     def reverse_fcn(self):
 
-        # rad/s 에서 percentage로의 변환 다항식
+        # rpm 에서 percentage로의 변환 다항식
         self.per_to_rpm_reverse_poly = np.polyfit(self.reverse_per, self.reverse_rpm, 1); # percentage 에서 rpm으로 변환식
         self.rpm_for_torque_reverse = np.polyval(self.per_to_rpm_reverse_poly, self.reverse_per_for_torque) # percentage(45~10)에 해당하는 rpm
         self.per_to_rpm_reverse_fcn = np.poly1d(self.per_to_rpm_reverse_poly)
 
-        # rad/s <-> torque 변환 다항식
+        # rpm <-> torque 변환 다항식
         self.rpm_to_torque_reverse_poly = np.polyfit(self.rpm_for_torque_reverse, self.reverse_torque, 2)
         self.rpm_to_torque_reverse_fcn = np.poly1d(self.rpm_to_torque_reverse_poly)
 
@@ -73,12 +73,12 @@ class thruster_converter:
 
     def forward_fcn(self):
 
-        # rad/s 에서 percentage로의 변환 다항식
+        # rpm 에서 percentage로의 변환 다항식
         self.per_to_rpm_forward_poly = np.polyfit(self.forward_per, self.forward_rpm, 1); # percentage 에서 rpm으로 변환식
         self.rpm_for_torque_forward = np.polyval(self.per_to_rpm_forward_poly, self.forward_per_for_torque) # percentage(45~10)에 해당하는 rpm
         self.per_to_rpm_forward_fcn = np.poly1d(self.per_to_rpm_forward_poly)
 
-        # rad/s <-> torque 변환 다항식
+        # rpm <-> torque 변환 다항식
         self.rpm_to_torque_forward_poly = np.polyfit(self.rpm_for_torque_forward, self.forward_torque, 2)
         self.rpm_to_torque_forward_fcn = np.poly1d(self.rpm_to_torque_forward_poly)
 
