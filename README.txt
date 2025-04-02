@@ -3,10 +3,10 @@ bash 파일에 설정해야 하는 것
 ROS2
 
 source /opt/ros/jazzy/setup.bash
-source ~/robot_ws_virtual/install/local_setup.bash
+source ~/robot_ws_manage/install/local_setup.bash
 
-alias cb='cd ~/robot_ws_virtual && colcon build --symlink-install && . ~/robot_ws_virtual/install/local_setup.bash'
-alias cs='cd ~/robot_ws_virtual/src'
+alias cb='cd ~/robot_ws_manage && colcon build --symlink-install && . ~/robot_ws_manage/install/local_setup.bash'
+alias cs='cd ~/robot_ws_manage/src'
 alias rt='ros2 topic list'
 alias testpub='ros2 run demo_nodes_py talker'
 alias testsub='ros2 run demo_nodes_py listener'
