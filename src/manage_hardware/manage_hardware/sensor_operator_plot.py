@@ -22,7 +22,7 @@ import signal
 class Sensor(Node):
     def __init__(self):
         super().__init__('sensor_operator')
-        self.declare_parameter('usb_port', '/dev/ttyUSB0')
+        self.declare_parameter('usb_port', '/dev/ttyUSB1')
         usb_port = self.get_parameter('usb_port').get_parameter_value().string_value
         self.qos_profile = QoSProfile(depth=10)
         # self.qos_profile = QoSProfile(history = QoSHistoryPolicy.KEEP_LAST, depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
@@ -135,7 +135,7 @@ class SensorApp(QMainWindow):
         self.sensor = sensor
         self.threadhold = 200
 
-        self.ui = uic.loadUi('UI/sensor.ui', self)
+        self.ui = uic.loadUi('UI/sensor_plot.ui', self)
         self.init_ui()
         
         self.force_data = [[], [], []]  # 각 축의 힘 데이터를 저장하는 리스트
@@ -145,32 +145,32 @@ class SensorApp(QMainWindow):
     def init_ui(self):
 
         # plot 위젯 찾기
-        # self.plot_force = self.findChild(PlotWidget, 'plot_force')
-        # self.plot_torque = self.findChild(PlotWidget, 'plot_torque')
+        self.plot_force = self.findChild(PlotWidget, 'plot_force')
+        self.plot_torque = self.findChild(PlotWidget, 'plot_torque')
 
         
-        # self.plot_force_x = self.plot_force.plot(pen='r', name='Force_x')
-        # self.plot_force_y = self.plot_force.plot(pen='g', name='Force_y')
-        # self.plot_force_z = self.plot_force.plot(pen='b', name='Force_z')
-        # self.plot_forces = [self.plot_force_x, self.plot_force_y, self.plot_force_z]
-        # self.plot_force.setTitle("Force Readings")
-        # self.plot_force.setBackground("w")
-        # self.plot_force.setYRange(-30, 30)
-        # self.plot_force.addLegend(offset=(10, 30))
+        self.plot_force_x = self.plot_force.plot(pen='r', name='Force_x')
+        self.plot_force_y = self.plot_force.plot(pen='g', name='Force_y')
+        self.plot_force_z = self.plot_force.plot(pen='b', name='Force_z')
+        self.plot_forces = [self.plot_force_x, self.plot_force_y, self.plot_force_z]
+        self.plot_force.setTitle("Force Readings")
+        self.plot_force.setBackground("w")
+        self.plot_force.setYRange(-30, 30)
+        self.plot_force.addLegend(offset=(10, 30))
 
-        # self.plot_torque_x = self.plot_torque.plot(pen='r', name='Torque_x')
-        # self.plot_torque_y = self.plot_torque.plot(pen='g', name='Torque_y')
-        # self.plot_torque_z = self.plot_torque.plot(pen='b', name='Torque_z')
-        # self.plot_torques = [self.plot_torque_x, self.plot_torque_y, self.plot_torque_z]
-        # self.plot_torque.setTitle("Torque Readings")
-        # self.plot_torque.setYRange(-3, 3)
-        # self.plot_torque.setBackground("w")
-        # self.plot_torque.addLegend(offset=(10, 30))
+        self.plot_torque_x = self.plot_torque.plot(pen='r', name='Torque_x')
+        self.plot_torque_y = self.plot_torque.plot(pen='g', name='Torque_y')
+        self.plot_torque_z = self.plot_torque.plot(pen='b', name='Torque_z')
+        self.plot_torques = [self.plot_torque_x, self.plot_torque_y, self.plot_torque_z]
+        self.plot_torque.setTitle("Torque Readings")
+        self.plot_torque.setYRange(-3, 3)
+        self.plot_torque.setBackground("w")
+        self.plot_torque.addLegend(offset=(10, 30))
 
         # ### 타이머 설정 ###
-        # self.timer = QTimer(self)
-        # self.timer.timeout.connect(self.update_data)
-        # self.timer.start(5)  # 100ms 간격으로 업데이트
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_data)
+        self.timer.start(5)  # 100ms 간격으로 업데이트
         
         # 버튼 위젯 찾기
         self.btn_bias = self.findChild(QPushButton, 'Setbias')
@@ -179,24 +179,24 @@ class SensorApp(QMainWindow):
         self.btn_quit = self.findChild(QPushButton, 'Quit')
 
         # 라벨 위젯 찾기
-        # self.label_force_x = self.findChild(QLabel, 'ForceX')
-        # self.label_torque_x = self.findChild(QLabel, 'TorqueX')
-        # self.label_force_y = self.findChild(QLabel, 'ForceY')
-        # self.label_torque_y = self.findChild(QLabel, 'TorqueY')
-        # self.label_force_z = self.findChild(QLabel, 'ForceZ')
-        # self.label_torque_z = self.findChild(QLabel, 'TorqueZ')
+        self.label_force_x = self.findChild(QLabel, 'ForceX')
+        self.label_torque_x = self.findChild(QLabel, 'TorqueX')
+        self.label_force_y = self.findChild(QLabel, 'ForceY')
+        self.label_torque_y = self.findChild(QLabel, 'TorqueY')
+        self.label_force_z = self.findChild(QLabel, 'ForceZ')
+        self.label_torque_z = self.findChild(QLabel, 'TorqueZ')
 
-        # self.force_labels = [
-        #     self.findChild(QLabel, 'force_x_data'),
-        #     self.findChild(QLabel, 'force_y_data'),
-        #     self.findChild(QLabel, 'force_z_data')
-        # ]
+        self.force_labels = [
+            self.findChild(QLabel, 'force_x_data'),
+            self.findChild(QLabel, 'force_y_data'),
+            self.findChild(QLabel, 'force_z_data')
+        ]
 
-        # self.torque_labels = [
-        #     self.findChild(QLabel, 'torque_x_data'),
-        #     self.findChild(QLabel, 'torque_y_data'),
-        #     self.findChild(QLabel, 'torque_z_data')
-        # ]
+        self.torque_labels = [
+            self.findChild(QLabel, 'torque_x_data'),
+            self.findChild(QLabel, 'torque_y_data'),
+            self.findChild(QLabel, 'torque_z_data')
+        ]
 
         # # 버튼 클릭 이벤트 연결
         self.btn_bias.clicked.connect(self.set_bias)
@@ -207,8 +207,8 @@ class SensorApp(QMainWindow):
     def update_data(self):
         force = self.sensor.decoded_force
         torque = self.sensor.decoded_torque
-        # self.label_force_x_data.setText(f'Force: {force[0]}, {force[1]}, {force[2]}')
-        # self.label_force_y_data.setText(f'Torque: {torque[0]}, {torque[1]}, {torque[2]}')
+        self.label_force_x_data.setText(f'Force: {force[0]}, {force[1]}, {force[2]}')
+        self.label_force_y_data.setText(f'Torque: {torque[0]}, {torque[1]}, {torque[2]}')
 
         for i, label in enumerate(self.force_labels):
             label.setText(f'{force[i]}')
@@ -228,8 +228,8 @@ class SensorApp(QMainWindow):
             self.plot_forces[i].setData(self.force_data[i])
             self.plot_torques[i].setData(self.torque_data[i])
 
-        # self.plot_force.setData(self.force_data[0])  # 평탄화하여 데이터 설정
-        # self.plot_torque.setData(self.torque_data[0])
+        self.plot_force.setData(self.force_data[0])
+        self.plot_torque.setData(self.torque_data[0])
 
     def set_bias(self):
         if self.sensor.init_status:

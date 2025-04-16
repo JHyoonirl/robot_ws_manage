@@ -1,11 +1,11 @@
-import numpy as np
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float64, Float64MultiArray
 from geometry_msgs.msg import Vector3
 from custominterface.srv import Status
 from rclpy.qos import QoSProfile
-import math
+
+
 from thruster_torque_converter import thruster_converter
 from passive_program import Passive_mode
 from RMD_custom import RMD# 가정한 모듈과 클래스 이름
@@ -17,6 +17,9 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QPushButton, QVB
 from PyQt5.QtCore import QTimer, Qt
 from PyQt5 import uic
 from pyqtgraph import PlotWidget, TextItem
+
+import numpy as np
+import math
 from threading import Thread
 import threading
 import sys
@@ -236,6 +239,7 @@ class Rehab(Node):
         self.Kp_assistance = float(data["kp_assistance"])
         self.Ki_assistance = float(data["ki_assistance"])
         self.Kd_assistance = float(data["kd_assistance"])
+
     def controller_reset(self):
         self.input_torque_passive= 0
         self.integral_error_passive = 0
@@ -248,6 +252,7 @@ class Rehab(Node):
         self.input_torque_assistance= 0
         self.integral_error_assistance = 0
         self.error_assistance = 0
+        
     def read_imu(self):
         self.imu_shank = self.create_subscription(
             Vector3,

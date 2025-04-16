@@ -18,7 +18,7 @@ def generate_launch_description():
 #             )
     
     usb_port_sensor = DeclareLaunchArgument(
-            'usb_port_sensor', default_value='/dev/ttyUSB1',
+            'usb_port_sensor', default_value='/dev/ttyUSB0',
             description='USB port for FT sensor'
             )
     
