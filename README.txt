@@ -1,3 +1,7 @@
+## 개발 환경 set up
+- ros2 jazzy 기준 코드 구축
+- ubuntu 24.04 LTS
+## Bashrc 파일에 설정 추가해야 하는 부분
 1)
 bash 파일에 설정해야 하는 것
 ROS2
