@@ -1,29 +1,16 @@
-# from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QLabel, QWidget, QDial, QPushButton, QTextBrowser, QCheckBox, QTextEdit
-# from PyQt5.QtCore import QTimer, Qt
-# from PyQt5 import uic
-# from pyqtgraph import PlotWidget  # 그래프를 위한 라이브러리
 import sys
 import rclpy
 from std_msgs.msg import Float64, Float64MultiArray
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
-# print(sys.path)
-# sys.path.append('C:/Users/IRL/Knee rehab')
-
 
 import warnings
 
-# warnings.filterwarnings("ignore", category=DeprecationWarning)
-
-import argparse
 from manage_hardware.RMD_custom import RMD# 가정한 모듈과 클래스 이름
 import threading
 import time
-import math
-import traceback
 import json
 from Muscle import Muscle
-import signal
 
 
 
@@ -61,8 +48,8 @@ class Motor(Node):
         self.motor_controller_thread = threading.Thread(target=self.controller, daemon=True)
 
         # Motor Safety Range (ROM)
-        self.knee_safe_rom_upper = 120
-        self.knee_safe_rom_lower = 40
+        self.ROM_SAFE_UPPER = 120
+        self.ROM_SAFE_LOWER = 40
 
         # Publishers
         self.motor_info_publisher = self.create_publisher(Float64MultiArray, 'Motor_info', self.qos_profile)
@@ -84,11 +71,12 @@ class Motor(Node):
 
         self.motor_control_mode = 0
         '''
-        0. extension constant velocity
-        1. extension constant acc
-        2. resistance
-        3. assistance
-        4. user command position move
+        1. extension constant velocity
+        2. extension constant acc
+        3. passive exercise
+        4. resistance exercise
+        5. assistance exercise
+        6. position move
         '''
 
         self.control_switch_status = 0
@@ -112,49 +100,44 @@ class Motor(Node):
         self.motor_control_mode_subscriber = self.create_subscription(
             Float64MultiArray, 'Motor_control_mode', self.motor_control_mode_callback, self.qos_profile
         )
-        self.motor_position_control_subscriber = self.create_subscription(
-            Float64MultiArray, 'Motor_position_control_info', self.motor_position_callback, self.qos_profile
+        self.motor_hydrodynamic_control_subscriber = self.create_subscription(
+            Float64MultiArray, 'Motor_hydrodynamic_control_info', self.motor_hydrodynamic_callback, self.qos_profile
         )
-        self.motor_speed_control_subscriber = self.create_subscription(
-            Float64MultiArray, 'Motor_speed_control_info', self.motor_speed_callback, self.qos_profile
+        self.motor_resistance_control_subscriber = self.create_subscription(
+            Float64MultiArray, 'Motor_resistance_control_info', self.motor_resistance_callback, self.qos_profile
         )
-        self.motor_torque_control_subscriber = self.create_subscription(
-            Float64MultiArray, 'Motor_torque_control_info', self.motor_torque_callback, self.qos_profile
-        )
-        self.motor_acc_control_subscriber = self.create_subscription(
-            Float64MultiArray, 'Motor_acc_control_info', self.motor_acc_callback, self.qos_profile
-        )
-        self.motor_ramp_control_subscriber = self.create_subscription(
-            Float64MultiArray, 'Motor_ramp_control_info', self.motor_ramp_callback, self.qos_profile
-        )
-        self.motor_ramp_control_subscriber = self.create_subscription(
-            Float64MultiArray, 'Motor_ramp_control_info', self.motor_sine_callback, self.qos_profile
+        self.motor_assistance_control_subscriber = self.create_subscription(
+            Float64MultiArray, 'Motor_assistance_control_info', self.motor_assistance_callback, self.qos_profile
         )
 
-        # Control Inputs
+        # Control Switch Inputs
         
-        self.motor_control_mode_info = [0.0, 0.0, 0.0]  # [main control switch, control mode switch, control switch]
-        
-        # 1) Position Control 받아야 하는 값들(torque closed loop 사용): desired angle, PID gain
-        self.Desired_angle = 0.0
-        self.motor_position_PID = [0.0, 0.0, 0.0]
-        self.Desired_angle_info = [0.0, 0.0, 0.0]  # [desired angle, previous error, integral error]
+        self.motor_control_mode_info = [0.0, 0.0, 0.0, 0.0]  
+        '''
+        motor control mode setting parameter
 
-        # 2) Speed Control 받아야 하는 값들: desired speed, PID gain
-        self.Desired_speed = 0.0
-        self.motor_speed_PID = [0.0, 0.0, 0.0]  # Speed control PID inputs
-        self.Desired_speed_info = [0.0, 0.0, 0.0]  # [desired angle, previous error, integral error]
+        [main control switch, control mode switch, control switch, muscle switch]
+        '''
+        
+        # Hydrodynamic experimental setup
+        self.desired_velocity = 0.0
+        self.desired_acceleration = 0.0
+        self.test_rom_upper = 0.0
+        self.test_rom_lower = 0.0
 
-        # 3) Torque Control 받아야 하는 값들: desired torque, PID gain
-        self.Desired_torque = 0.0
-        self.motor_torque_PID = [0.0, 0.0, 0.0]  # Torque control PID inputs
-        self.Desired_torque_info = [0.0, 0.0, 0.0]  # [desired angle, previous error, integral error]
+        # motor exercise control parameter setup
         
+        # common parameter
+        self.exercise_desired_angle = 0.0
+        self.knee_angle_imu = 0.0
         
-        
-        # self.neutral_angle = 0
-        self.neutral_torque = 0 # 중립 위치에서 발생하는 토크는?
-        self.position_error = 0
+        # resistance parameter
+        self.resistance_pid = [0.0, 0.0, 0.0] # resistance PID gain
+        self.resistance_state = 0.0 # resistance hold time
+
+        # assistance parameter
+        self.assistance_pid = [0.0, 0.0, 0.0] # assistance PID gain
+        self.assistance_state = 0.0 # assistance hold time
 
         with open("custom_json/motor_info.json", "r") as fr:
             data = json.load(fr)
@@ -171,8 +154,8 @@ class Motor(Node):
         status_2 = self.init_acceleration()
         if status_1 == True and status_2 == True:
             self.motor_senser_thread.start()
-            self.motor_controller_thread.start()
-        
+            self.motor_controller_thread.start()    
+    
     def init_motor(self):
         # 스케일링된 값들을 바이트 배열로 변환하여 전달
         response = self.RMD.read_pid()
@@ -220,7 +203,7 @@ class Motor(Node):
             self.knee_angle = self.motor_angle - self.Neutral_angle # encoder angle - neutral angle
 
             self.motor_info = Float64MultiArray()
-            self.motor_info.data = [self.voltage, self.torque_current, self.motor_velocity, self.knee_angle, self.motor_angle, self.control_switch_fuse]
+            self.motor_info.data = [self.motor_main_control_switch, self.voltage, self.torque_current, self.motor_velocity, self.motor_angle, self.knee_angle]
             
             self.motor_info_publisher.publish(self.motor_info)
 
@@ -228,225 +211,37 @@ class Motor(Node):
         while True:
             
             if self.knee_angle > self.knee_safe_rom_upper or self.knee_angle < self.knee_safe_rom_lower :
-                self.control_switch_fuse = 0
+                self.motor_main_control_switch = 0
 
             
-            if self.control_switch_fuse == 0 or self.motor_main_control_switch == 0:
+            if self.motor_main_control_switch == 0:
                 self.motor_off()
                 print('motor off')
                 time.sleep(1)
                 continue
 
             else:  
-                if self.motor_control_mode == 0: # 위치 제어
-                    # if self.position_control_activate_status == True: #제어 활성화
-                    self.motor_pos()
-                elif self.motor_control_mode == 1: # torque 제어
-                    self.motor_torque()
-                elif self.motor_control_mode == 2: # 속도 제어
-                    self.motor_speed()
-                elif self.motor_control_mode == 3: # 가속도 제어
-                    self.motor_acc()
-                elif self.motor_control_mode == 4: # ramp 제어
-                    self.motor_ramp()
-                elif self.motor_control_mode == 5: # sine 제어
-                    self.motor_sine()
-
-            
-            # print(time.time() - self.past_time)
+                if self.motor_control_mode == 1: # 등각속도 운동
+                    self.motor_constant_velocity()
+                elif self.motor_control_mode == 2: # 등각가속도 운동
+                    self.motor_constant_acc()
+                elif self.motor_control_mode == 3: # passive exercise
+                    self.motor_passive()
+                elif self.motor_control_mode == 4: # resistance exercise
+                    self.motor_resistance()
+                elif self.motor_control_mode == 5: # assistance exercise
+                    self.motor_assistance()
+                elif self.motor_control_mode == 6: # angle move
+                    self.motor_angle_move()
             self.past_time = time.time()
-
-            # time.sleep(self.dt_sleep)
 
 
     def motor_off(self):
         self.RMD.raw_motor_off()
-        self.torque_desired_angle_info = [0.0, 0.0, 0.0]
-        self.position_desired_angle_info = [0.0, 0.0, 0.0]
 
-    def motor_control_mode_callback(self, msg):
-        # motor control mode가 바뀔 때만 호출됨
-        try:
-            self.motor_control_mode_info = msg.data
-            self.motor_main_control_switch = int(self.motor_control_mode_info[0]) # 0: off, 1: on
-            self.motor_control_mode = int(self.motor_control_mode_info[1]) # 0: position, 1: torque, 2: speed, 3: acc, 4: ramp, 5: sine
-            self.control_switch_status = bool(self.motor_control_mode_info[2]) # fuse를 on 하기 위한 switch
-            
-            # fuse on하기 위한 조건문
-            if self.control_switch_status == 1:
-                self.control_switch_fuse = 1
-
-        except Exception as e:
-            print(f'Error: {e}')
-
-    def motor_pos(self):
+    def motor_constant_velocity(self):
         # motor position control을 위한 함수
         # option 1: 정해진 구간 안에서 desired position을 설정
-        try:
-            self.dt = time.time() - self.past_time
-            self.pos_error = self.Desired_angle - self.knee_angle
-
-            # Proportional term
-            proportional = self.Kp * self.pos_error
-
-            # Integral term
-            self.pos_error_integral += self.pos_error * self.dt
-            integral = self.Ki * self.pos_error_integral
-
-            # Derivative term
-            derivative = self.Kd * (self.pos_error - self.pos_error_prev) / self.dt
-
-            # Update previous error
-            self.pos_error_prev = self.pos_error
-
-            # Calculate the control output
-            output = proportional + integral + derivative
-
-            if abs(output) > self.torque_threshold:
-                if output > 0:
-                    output = self.torque_threshold
-                elif output < 0:
-                    output = - self.torque_threshold
-
-            temperature, torque, speed, angle = self.RMD.torque_closed_loop(int(output))
-            # self.get_logger().info('rmd torque, speed, angle: {0}'.format(torque, speed, angle))
-
-        except Exception as e:
-            print(f'Error2: {e}')
-
-    def motor_torque(self):
-        try:
-            self.dt = time.time() - self.past_time
-            self.pos_error = self.Desired_angle - self.knee_angle
-
-            # Proportional term
-            proportional = self.Kp * self.pos_error
-
-            # Integral term
-            self.pos_error_integral += self.pos_error * self.dt
-            integral = self.Ki * self.pos_error_integral
-
-            # Derivative term
-            derivative = self.Kd * (self.pos_error - self.pos_error_prev) / self.dt
-
-            # Update previous error
-            self.pos_error_prev = self.pos_error
-
-            # Calculate the control output
-            output = proportional + integral + derivative
-
-            if abs(output) > self.torque_threshold:
-                if output > 0:
-                    output = self.torque_threshold
-                elif output < 0:
-                    output = - self.torque_threshold
-
-            temperature, torque, speed, angle = self.RMD.torque_closed_loop(int(output))
-            # self.get_logger().info('rmd torque, speed, angle: {0}'.format(torque, speed, angle))
-
-        except Exception as e:
-            print(f'Error2: {e}')
-
-    def motor_speed(self):
-        try:
-            self.dt = time.time() - self.past_time
-            self.pos_error = self.Desired_angle - self.knee_angle
-
-            # Proportional term
-            proportional = self.Kp * self.pos_error
-
-            # Integral term
-            self.pos_error_integral += self.pos_error * self.dt
-            integral = self.Ki * self.pos_error_integral
-
-            # Derivative term
-            derivative = self.Kd * (self.pos_error - self.pos_error_prev) / self.dt
-
-            # Update previous error
-            self.pos_error_prev = self.pos_error
-
-            # Calculate the control output
-            output = proportional + integral + derivative
-
-            if abs(output) > self.torque_threshold:
-                if output > 0:
-                    output = self.torque_threshold
-                elif output < 0:
-                    output = - self.torque_threshold
-
-            temperature, torque, speed, angle = self.RMD.torque_closed_loop(int(output))
-            # self.get_logger().info('rmd torque, speed, angle: {0}'.format(torque, speed, angle))
-
-        except Exception as e:
-            print(f'Error2: {e}')
-
-    def motor_acc(self):
-        try:
-            self.dt = time.time() - self.past_time
-            self.pos_error = self.Desired_angle - self.knee_angle
-
-            # Proportional term
-            proportional = self.Kp * self.pos_error
-
-            # Integral term
-            self.pos_error_integral += self.pos_error * self.dt
-            integral = self.Ki * self.pos_error_integral
-
-            # Derivative term
-            derivative = self.Kd * (self.pos_error - self.pos_error_prev) / self.dt
-
-            # Update previous error
-            self.pos_error_prev = self.pos_error
-
-            # Calculate the control output
-            output = proportional + integral + derivative
-
-            if abs(output) > self.torque_threshold:
-                if output > 0:
-                    output = self.torque_threshold
-                elif output < 0:
-                    output = - self.torque_threshold
-
-            temperature, torque, speed, angle = self.RMD.torque_closed_loop(int(output))
-            # self.get_logger().info('rmd torque, speed, angle: {0}'.format(torque, speed, angle))
-
-        except Exception as e:
-            print(f'Error2: {e}')
-
-    def motor_speed(self):
-        try:
-            self.dt = time.time() - self.past_time
-            self.pos_error = self.Desired_angle - self.knee_angle
-
-            # Proportional term
-            proportional = self.Kp * self.pos_error
-
-            # Integral term
-            self.pos_error_integral += self.pos_error * self.dt
-            integral = self.Ki * self.pos_error_integral
-
-            # Derivative term
-            derivative = self.Kd * (self.pos_error - self.pos_error_prev) / self.dt
-
-            # Update previous error
-            self.pos_error_prev = self.pos_error
-
-            # Calculate the control output
-            output = proportional + integral + derivative
-
-            if abs(output) > self.torque_threshold:
-                if output > 0:
-                    output = self.torque_threshold
-                elif output < 0:
-                    output = - self.torque_threshold
-
-            temperature, torque, speed, angle = self.RMD.torque_closed_loop(int(output))
-            # self.get_logger().info('rmd torque, speed, angle: {0}'.format(torque, speed, angle))
-
-        except Exception as e:
-            print(f'Error2: {e}')
-
-    def motor_step(self):
         try:
             self.dt = time.time() - self.past_time
             self.pos_error = self.Desired_angle - self.knee_angle
@@ -686,7 +481,6 @@ def run_node(node):
 
 
 def main(args=None):
- 
     rclpy.init(args=args)
     motor = Motor()
 
