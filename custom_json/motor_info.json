@@ -1,1 +1,14 @@
-{"kp": 90.0, "ki": 0.0, "kd": 0.1, "neutral_angle": 205.0}
+{
+    "rom_safe_upper": 140.0,
+    "rom_safe_lower": 40.0,
+    "perpendicular_angle": 205.0,
+    "desired_velocity_input": 20.0,
+    "desired_acceleration_input": 10.0,
+    "test_p_input": 1.0,
+    "test_i_input": 1.0,
+    "test_d_input": 1.0,
+    "test_rom_upper_input": 130.0,
+    "test_rom_lower_input": 50.0,
+    "test_hold_time_input": 3.0,
+    "desired_angle_input": 0.0
+}

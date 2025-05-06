@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QLabel, QWidget, QDial, QPushButton, QTextBrowser, QCheckBox, QTextEdit
-from PyQt5.QtCore import QTimer, Qt
+from PyQt5.QtCore import QTimer, Qt, QThread
 from PyQt5 import uic
 from pyqtgraph import PlotWidget  # 그래프를 위한 라이브러리
 import sys
@@ -7,22 +7,10 @@ import rclpy
 from std_msgs.msg import Float64, Float64MultiArray
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
-# print(sys.path)
-# sys.path.append('C:/Users/IRL/Knee rehab')
+from rclpy.executors import MultiThreadedExecutor
 
-
-import warnings
-
-# warnings.filterwarnings("ignore", category=DeprecationWarning)
-
-import argparse
-from manage_hardware.RMD_custom import RMD# 가정한 모듈과 클래스 이름
-import threading
 import time
-import math
-import traceback
 import json
-from Muscle import Muscle
 import signal
 
 
@@ -42,452 +30,153 @@ class Motor(Node):
 
 
         ### ROS2 진행을 위한 코드 ###
-        super().__init__('RMD_Motor')
-        self.declare_parameter('usb_port', '/dev/ttyACM0')
-        usb_port = self.get_parameter('usb_port').get_parameter_value().string_value
+        super().__init__('RMD_Motor_GUI')
         self.qos_profile = QoSProfile(depth=10)
 
-        self.muscle = Muscle()
-
-        '''
-        muscle component
-        '''
-
-        self.RMD = RMD(0x141)
-        self.RMD.setup('slcan', usb_port)
-
-        self.motor_contol_thread = threading.Thread(target=self.controller, daemon=True)
-
-        self.Motor_info_publisher = self.create_publisher(Float64MultiArray, 'Motor_info', self.qos_profile)
-
-        self.Motor_control_mode_subscriber = self.create_subscription(Float64MultiArray, 'Motor_control_mode', self.motor_control_mode_callback, self.qos_profile)
-        # self.Motor_velocity_publisher = self.create_publisher(Float64, 'Motor_velocity', self.qos_profile)
-        
-        ## 모터 반시계 회전(-)은 Extension
-        ## 모터 시계 회전(+)은 flexion
-
-        self.MOTOR_ID = 1
-        self.ANGLE_INIT = 10
-        self.VELOCITY_LIMIT = 5000
-        self.Desired_angle = 0.0
-        self.control_check_status = False
-        self.position_control_check_status = False # 작동 Main Switch
-        self.sinusoidal_control_check_status = False # 작동 Main Switch
-        self.ramp_control_check_status = False # 작동 Main Switch
-        self.position_control_activate_status = False # step 작동 on/off Switch
-        self.sinusoidal_control_activate_status = False # step 작동 on/off Switch
-        self.ramp_control_activate_status = False # step 작동 on/off Switch
-        # self.neutral_angle = 0
-        self.neutral_torque = 0 # 중립 위치에서 발생하는 토크는?
-        self.position_error = 0
 
         with open("custom_json/motor_info.json", "r") as fr:
-            data = json.load(fr)
-        # print(data)
+            motor_data = json.load(fr)
 
-        self.Kp = float(data["kp"])
-        self.Kp_tmp = 20
-        self.Ki = float(data["ki"])
-        self.Kd = float(data["kd"])
-        self.Neutral_angle = float(data["neutral_angle"]) # 무릎의 0도에 해당하는 motor encoder의 각도
-        self.knee_angle = 0 # 무릎 각도 = encoder angle - self.Neutral_angle
+        self.motor_common_parameter_publisher = self.create_publisher(
+            Float64MultiArray, 'Motor_common_parameter', self.qos_profile)
 
-        self.pos_error = 0
-        self.pos_error_prev = 0
-        self.pos_error_integral = 0
-        self.dt_sleep = 0.001
-        self.past_time = time.time()
+        self.motor_control_mode_publisher = self.create_publisher(
+            Float64MultiArray, 'Motor_control_mode', self.qos_profile)
 
-        self.amplitude_sine = 0.0
-        self.period_sine = 0.0
-        self.pos_offset_sine = 0.0
-        self.RMD_timer_sine= 0.0
-        self.state_sine = 1
-
-        self.amplitude_ramp = 0.0 #  initial_condition
-        self.velocity_ramp = 0.0 # velocity
-        self.pos_offset_ramp = 0.0 # last_condition
-        self.RMD_timer_ramp = 0.0
-        self.state_ramp = 1 # 1: decrease 2: increase
-        self.waypoint_ramp = 0
-
-        self.voltage = 0
-        self.temperature = 0
-        self.torque_current = 0
-        self.velocity = 0
-        self.angle = 0
-
-        self.torque_threshold = 650
-
-        self.torque_out = 0
-        status_1 = self.init_motor()
-        status_2 = self.init_acceleration()
-        if status_1 == True and status_2 == True:
-            self.motor_contol_thread.start()
+        self.motor_hydrodynamic_control_publisher = self.create_publisher(
+            Float64MultiArray, 'Motor_hydrodynamic_control_info', self.qos_profile)
         
-    def init_motor(self):
-        # 스케일링된 값들을 바이트 배열로 변환하여 전달
-        response = self.RMD.read_pid()
-        data = response.data
-        self.kp_cur = data[2]
-        self.ki_cur = data[3]
-        self.kp_vel = data[4]
-        self.ki_vel = data[5]
-        self.kp_pos = data[6]
-        self.ki_pos = data[7]
+        self.motor_info_subscriber = self.create_subscription(
+            Float64MultiArray, 'Motor_info', self.motor_info_update_callback, self.qos_profile)
+        
 
-        print(self.kp_cur, self.ki_cur)
-        print(self.kp_vel, self.ki_vel)
-        print(self.kp_pos, self.ki_pos)
-        data = [
-            self.RMD.byteArray(self.kp_cur, 1) ,
-            self.RMD.byteArray(self.ki_cur, 1),
-            self.RMD.byteArray(self.kp_vel, 1),
-            self.RMD.byteArray(self.ki_vel, 1),
-            self.RMD.byteArray(self.kp_pos, 1),
-            self.RMD.byteArray(self.ki_pos, 1)
-        ]
-        # 바이트 배열을 하나의 플랫 리스트로 변환
-        flat_data = [item for sublist in data for item in sublist]
-        self.RMD.write_pid_ram(flat_data)
-        print('initialized Motor')
-        return True
+        self.knee_angle = 0.0
+        self.motor_velocity = 0.0
 
-    def init_acceleration(self):
-        for i in range(4):
-            index = self.RMD.byteArray(i, 1)
-            response = self.RMD.read_acceleration(index)
-            data = response.data
-            acc = int.from_bytes(data[4:8], byteorder='little', signed=True)
-            input_acc = self.RMD.byteArray(40000, 4)
-            self.RMD.write_acceleration(index, input_acc)
-        print('initialized Motor acc')
-        return True
+        self.motor_power_enabled_sub = 0
+        '''
+        0. off
+        1. on
+        '''
 
-    def controller(self):
-        while True:
-            # print(self.control_check_status)
-            try:
-                self.voltage, self.temperature, self.torque_current, self.velocity, self.angle, error = self.RMD.status_motor() #
-                # print(error)
-                self.knee_angle = self.angle - self.Neutral_angle # encoder angle - neutral angle
-                self.motor_info = Float64MultiArray()
-                self.motor_info.data = [self.voltage, self.torque_current, self.knee_angle, self.velocity]
-                self.torque_out_info = self.torque_current
-                self.Motor_info_publisher.publish(self.motor_info)
-                # self.motor_info.data = float(self.knee_angle)
-                # self.Motor_info_publisher.publish(self.motor_info)
-                # time.sleep(0.001)
-            except Exception as e:
-                print(f'Error1: {e}')
-            if self.control_check_status == False:
-                self.motor_off()
-            else:  
-                if self.position_control_check_status == True and self.position_control_activate_status == True: # step 제어 가능
-                    # if self.position_control_activate_status == True: #제어 활성화
-                    self.motor_step()
-                elif self.sinusoidal_control_check_status == True and self.sinusoidal_control_activate_status == True: # sine 제어 가능
-                    '''
-                    acceleration 
-                    '''
-                    self.motor_sine()
-                elif self.ramp_control_check_status == True and self.ramp_control_activate_status == True: # sine 제어 가능
-                    '''
-                    velocity 
-                    '''
-                    self.motor_ramp()
-                else:
-                    self.motor_off()
+        self.motor_power_enabled_pub = 0 # motor published control switch
 
-            
-            # print(time.time() - self.past_time)
-            self.past_time = time.time()
-
-            # time.sleep(self.dt_sleep)
+        self.motor_control_mode = 0
+        '''
+        1. extension constant velocity
+        2. extension constant acceleration
+        3. passive exercise
+        4. resistance exercise
+        5. assistance exercise
+        6. angle move
+        '''
+        self.control_active_sub = 0
+        self.control_active_pub = 0
+        '''
+        0. stop
+        1. start
+        '''
+        self.muscle_passive_component_switch = 0
+        '''
+        0. stop
+        1. start
+        '''
 
 
-    def motor_off(self):
-        self.RMD.raw_motor_off()
-        self.pos_error = 0
-        self.pos_error_prev = 0
-        self.pos_error_integral = 0
+        self.common_dict = {'rom_safe_upper': motor_data['rom_safe_upper'],
+                    'rom_safe_lower': motor_data['rom_safe_lower'],
+                    'perpendicular_angle': motor_data['perpendicular_angle']}
+        
+        self.hydro_dict = {'desired_velocity_input': motor_data['desired_velocity_input'],
+                    'desired_acceleration_input': motor_data['desired_acceleration_input'], 
+                    'test_p_input': motor_data['test_p_input'],
+                    'test_i_input': motor_data['test_i_input'],
+                    'test_d_input': motor_data['test_d_input'],
+                    'test_rom_upper_input': motor_data['test_rom_upper_input'],
+                    'test_rom_lower_input': motor_data['test_rom_lower_input'],
+                    'test_hold_time_input': motor_data['test_hold_time_input']}
+        
+        self.angle_dict = {'desired_angle_input': motor_data['desired_angle_input']}
 
-    def motor_step(self):
-        try:
-            # _ = self.RMD.position_closed_loop(self.Desired_pos, self.VELOCITY_LIMIT)
-            self.dt = time.time() - self.past_time
-            self.pos_error = self.Desired_angle - self.knee_angle
+        self.timer = self.create_timer(0.01, self.motor_control_pub)
 
-            # Proportional term
-            proportional = self.Kp * self.pos_error
+    def motor_control_pub(self):
+        self.motor_common_parameter_pub()
+        self.motor_control_mode_pub()
+        self.motor_hydrodynamic_pub()
+        
+    def motor_info_update_callback(self, msg):
+        msg = msg.data
+        '''
+        motor_power_enabled
+        control_active
+        voltage
+        torque_current
+        motor_velocity
+        motor_angle
+        knee_angle
+        '''
 
-            # Integral term
-            self.pos_error_integral += self.pos_error * self.dt
-            integral = self.Ki * self.pos_error_integral
+        self.motor_power_enabled_sub = msg[0]
+        self.control_active_sub = msg[1]
+        self.motor_velocity = msg[4]
+        self.knee_angle = msg[6]
+        
 
-            # Derivative term
-            derivative = self.Kd * (self.pos_error - self.pos_error_prev) / self.dt
+    def motor_common_parameter_pub(self):
+        '''
+        rom_safe_upper
+        rom_safe_lower
+        perpendicular_angle
+        '''
+        msg = Float64MultiArray()
+        msg.data = [self.common_dict['rom_safe_upper'],
+                    self.common_dict['rom_safe_lower'],
+                    self.common_dict['perpendicular_angle']]
+        self.motor_common_parameter_publisher.publish(msg)
 
-            # Update previous error
-            self.pos_error_prev = self.pos_error
+    def motor_control_mode_pub(self):
+        '''
+        motor_power_enabled
+        motor_control_mode 
+        control_active 
+        muscle_passive_component_switch
+        '''
+        msg = Float64MultiArray()
+        msg.data = [self.motor_power_enabled_pub, self.motor_control_mode, self.control_active_pub, self.muscle_passive_component_switch]
+        self.motor_control_mode_publisher.publish(msg)
 
-            # Calculate the control output
-            output = proportional + integral + derivative
-
-            if abs(output) > self.torque_threshold:
-                if output > 0:
-                    output = self.torque_threshold
-                elif output < 0:
-                    output = - self.torque_threshold
-
-            temperature, torque, speed, angle = self.RMD.torque_closed_loop(int(output))
-            # self.get_logger().info('rmd torque, speed, angle: {0}'.format(torque, speed, angle))
-
-        except Exception as e:
-            print(f'Error2: {e}')
-
-    def motor_sine(self):
-        try:
-            '''
-            # self.dt = time.time() - self.past_time
-            # sine_time = time.time() - self.RMD_timer_sinusoidal
-            # self.Desired_angle = self.amplitude * math.sin(self.period * sine_time) + self.pos_offset
-
-            # self.pos_error = self.Desired_angle - self.knee_angle
-            # print(self.pos_error)
-
-            # # Proportional term
-            # proportional = self.Kp * self.pos_error
-
-            # # Integral term
-            # self.pos_error_integral += self.pos_error * self.dt
-            # integral = self.Ki * self.pos_error_integral
-
-            # # Derivative term
-            # derivative = self.Kd * (self.pos_error - self.pos_error_prev) / self.dt
-
-            # # Update previous error
-            # self.pos_error_prev = self.pos_error
-
-            # # Calculate the control output
-            # output = proportional + integral + derivative
-            # if abs(output) > self.torque_threshold:
-            #     if output > 0:
-            #         output = self.torque_threshold
-            #     elif output < 0:
-            #         output = - self.torque_threshold
-            # self.torque_out = output
-            # temperature, torque, speed, angle = self.RMD.torque_closed_loop(int(output))
-            # self.get_logger().info('rmd torque, speed, angle: {0}'.format(torque, speed, angle))
-            '''
-            self.dt = time.time() - self.past_time
-            sine_time = time.time() - self.RMD_timer_sine
-            if sine_time < 3:
-                sine_time = 0
-
-
-                self.Desired_angle = self.amplitude_sine
-
-                if self.Desired_angle < self.pos_offset_sine:
-                    self.Desired_angle = self.pos_offset_sine
-
-                
-                self.get_logger().info('rself.state_sine: {0}'.format(self.state_sine))
-
-                self.pos_error = self.Desired_angle - self.knee_angle
-                # print(self.pos_error)
-
-                if sine_time < 3:
-                    proportional = self.Kp_tmp * self.pos_error
-                else:
-                    proportional = self.Kp * self.pos_error
-                
-
-                # Integral term
-                self.pos_error_integral += self.pos_error * self.dt
-                integral = self.Ki * self.pos_error_integral
-
-                # Derivative term
-                derivative = self.Kd * (self.pos_error - self.pos_error_prev) / self.dt
-
-                # Update previous error
-                self.pos_error_prev = self.pos_error
-
-                # Calculate the control output
-                output = proportional + integral + derivative
-                self.torque_out = output
-                if abs(output) > self.torque_threshold:
-                    if output > 0:
-                        output = self.torque_threshold
-                    elif output < 0:
-                        output = - self.torque_threshold
-    
-                temperature, torque, speed, angle = self.RMD.torque_closed_loop(int(output))
-            elif sine_time > 3:
-                acc = - self.period_sine
-                vel_for_constant_acc_input = 100*(sine_time - 3)*acc
-                sine_time = sine_time - 3
-                
-                '''
-                1 torque : 1 deg /s^2
-                '''
-                if self.knee_angle < self.pos_offset_sine:
-                    self.state_sine = 2
-                
-                if self.knee_angle > self.pos_offset_ramp and self.state_sine ==1:
-                    _a = self.RMD.speed_closed_loop(int(vel_for_constant_acc_input))
-                    self.get_logger().info('rself.state_ramp: {0}'.format(_a))
-                    
-                elif self.state_sine == 2:
-                    _a = self.RMD.speed_closed_loop(int(0))
-                    vel_for_constant_acc_input = 0.0
-                     
-
-        except Exception as e:
-            print(f'Error3: {e}')
-
-    def motor_ramp(self):
-        try:
-            self.dt = time.time() - self.past_time
-            
-            # self.Desired_angle = self.amplitude * math.sin(self.period * sine_time) + self.pos_offset
-            
-            # if self.state_ramp == 1 and abs(self.Desired_angle - (self.pos_offset_ramp - self.amplitude_ramp)) < 1:
-            #     self.state_ramp = 2
-            #     self.waypoint_ramp = self.Desired_angle
-            #     self.RMD_timer_ramp = time.time()
-            # elif self.state_ramp == 2 and abs(self.Desired_angle - (self.pos_offset_ramp + self.amplitude_ramp)) < 1:
-            #     self.state_ramp = 1
-            #     self.waypoint_ramp = self.Desired_angle
-            #     self.RMD_timer_ramp = time.time()
-            
-            # if self.state_ramp == 1:
-            #     sign = -1
-            # elif self.state_ramp == 2:
-            #     sign = 1
-            ramp_time = time.time() - self.RMD_timer_ramp
-            if ramp_time < 3:
-                ramp_time = 0
-
-
-                self.Desired_angle = self.amplitude_ramp
-
-                if self.Desired_angle < self.pos_offset_ramp:
-                    self.Desired_angle = self.pos_offset_ramp
-
-                
-                
-
-                self.pos_error = self.Desired_angle - self.knee_angle
-                # print(self.pos_error)
-
-                if ramp_time < 3:
-                    proportional = self.Kp_tmp * self.pos_error
-                else:
-                    proportional = self.Kp * self.pos_error
-                
-
-                # Integral term
-                self.pos_error_integral += self.pos_error * self.dt
-                integral = self.Ki * self.pos_error_integral
-
-                # Derivative term
-                derivative = self.Kd * (self.pos_error - self.pos_error_prev) / self.dt
-
-                # Update previous error
-                self.pos_error_prev = self.pos_error
-
-                # Calculate the control output
-                output = proportional + integral + derivative
-                self.torque_out = output
-                if abs(output) > self.torque_threshold:
-                    if output > 0:
-                        output = self.torque_threshold
-                    elif output < 0:
-                        output = - self.torque_threshold
-    
-                temperature, torque, speed, angle = self.RMD.torque_closed_loop(int(output))
-                
-
-
-            elif ramp_time > 3:
-                try:
-                    ramp_time = ramp_time - 3
-                    # print(ramp_time)
-                    velocity = - 100*self.velocity_ramp
-                    '''
-                    1 velocity : 1 deg/s
-                    '''
-                    if self.knee_angle < self.pos_offset_ramp:
-                        self.state_ramp = 2
-                    
-                    if self.knee_angle > self.pos_offset_ramp and self.state_ramp ==1:
-                        _a = self.RMD.speed_closed_loop(int(velocity))
-                        
-                        
-                        
-                    elif self.state_ramp ==2:
-                        _a = self.RMD.speed_closed_loop(int(0))
-                        
-                except Exception as e:
-                    print(f'Error3: {e}')
-
-            # sign = -1
-
-            
-            # self.get_logger().info('rmd torque, speed, angle: {0}'.format(torque, speed, angle))
-                        
-
-        except Exception as e:
-            print(f'Error3: {e}')
-
-    # def muscle_passive(self):
-    #     theta = self.angle
-    #     dtheta = self.velocity
-
-
-    #     pass
+    def motor_hydrodynamic_pub(self):
+        msg = Float64MultiArray()
+        msg.data = [self.hydro_dict['desired_velocity_input'],
+                    self.hydro_dict['desired_acceleration_input'],
+                    self.hydro_dict['test_p_input'],
+                    self.hydro_dict['test_i_input'],
+                    self.hydro_dict['test_d_input'],
+                    self.hydro_dict['test_rom_upper_input'],
+                    self.hydro_dict['test_rom_lower_input'],
+                    self.hydro_dict['test_hold_time_input']]
+        self.motor_hydrodynamic_control_publisher.publish(msg)
 
 
 class MotorWindow(QMainWindow):
-    def __init__(self, RMD=None):
+    def __init__(self, motor=Motor):
         QMainWindow.__init__(self)
         # self.rmd = RMD(port='COM3')  # 포트는 환경에 따라 변경
-        self._RMD = RMD
-        self.Desired_Angle_list = []
-        self.Current_Angle_list = []
-        self.error_Angle_list = []
-        self.Speed_list = []
-        self.threadhold = 500
-        self.ui = uic.loadUi('UI/motor.ui', self)
+        self.motor = motor
+
+        self.ui = uic.loadUi('UI/motor_gui.ui', self)
 
         self.initUI()
-        # print("initialize rmd motor")
-        # self.initTimer()
         self.show()
 
     def initUI(self):
-        # plot 위젯 찾기
-        self.Plot_Angle = self.findChild(PlotWidget, 'Plot_Angle')
-        self.Plot_Velocity = self.findChild(PlotWidget, 'Plot_Velocity')
         
-        self.Plot_Angle_desired_data = self.Plot_Angle.plot(pen='r', name='Angle_desired')
-        self.Plot_Angle_current_data = self.Plot_Angle.plot(pen='b', name='Angle_current')
-        # self.Plot_Angle_error_data = self.Plot_Angle.plot(pen='g', name='Angle_current')
-        # self.Plot_Angle.setTitle("Angle Readings")
-        self.Plot_Angle.setBackground("w")
-        # self.Plot_Angle.setYRange(-30, 30)
-        # self.Plot_Angle.addLegend(offset=(10, 30))
-
-        self.Plot_Velocity_data = self.Plot_Velocity.plot(pen='r', name='Velocity')
-        # self.Plot_Velocity.setTitle("Velocity Readings")
-        # self.plot_torque.setYRange(-3, 3)
-        self.Plot_Velocity.setBackground("w")
-        # self.plot_torque.addLegend(offset=(10, 30))
-
         # textbrowser 위젲
-        self.Angle_text = self.findChild(QTextBrowser, 'angle_data')
-        self.Velocity_text = self.findChild(QTextBrowser, 'velocity_data')
+        self.angle_text = self.findChild(QTextBrowser, 'angle_data')
+        self.velocity_text = self.findChild(QTextBrowser, 'velocity_data')
+        self.motor_power_enabled_status_text = self.findChild(QTextBrowser, 'motor_power_enabled_status')
+        self.motor_control_active_text = self.findChild(QTextBrowser, 'motor_control_active')
 
         ### 타이머 설정 ###
         self.timer = QTimer(self)
@@ -495,389 +184,384 @@ class MotorWindow(QMainWindow):
         self.timer.start(100)  # 100ms 간격으로 업데이트
         
         # 체크 박스 정의
-        self.control_on_off = self.findChild(QCheckBox, 'Control_on_off_check')
-        self.position_control_check = self.findChild(QCheckBox, 'position_control_check')
-        self.sinusoidal_control_check = self.findChild(QCheckBox, 'sinusoidal_control_check')
-        self.ramp_control_check = self.findChild(QCheckBox, 'ramp_control_check')
+        self.control_on_off_check = self.findChild(QCheckBox, 'control_on_off_check')
 
-        self.control_on_off.stateChanged.connect(self.control_on_off_changed)
-        self.position_control_check.setDisabled(True)
-        self.sinusoidal_control_check.setDisabled(True)
-        self.ramp_control_check.setDisabled(True)
+        self.control_on_off_check.stateChanged.connect(self.control_on_off_changed)
 
-        self.position_control_check.stateChanged.connect(self.position_control_checked)
-        self.sinusoidal_control_check.stateChanged.connect(self.sinusoidal_control_checked)
-        self.ramp_control_check.stateChanged.connect(self.ramp_control_checked)
+        # 체크박스 이름과 연결 함수 딕셔너리 정의
+        self.checkboxes = {
+            'hydrodynamic_constant_velocity_check': {
+                'widget': self.findChild(QCheckBox, 'hydrodynamic_constant_velocity_check'),
+                'handler': self.hydrodynamic_constant_velocity_checked,
+                'status': False
+            },
+            'hydrodynamic_constant_acceleration_check': {
+                'widget': self.findChild(QCheckBox, 'hydrodynamic_constant_acceleration_check'),
+                'handler': self.hydrodynamic_constant_acceleration_checked,
+                'status': False
+            },
+            'desired_angle_move_check': {
+                'widget': self.findChild(QCheckBox, 'desired_angle_move_check'),
+                'handler': self.desired_angle_move_checked,
+                'status': False
+            },
+            'muscle_passive_component_check': {
+                'widget': self.findChild(QCheckBox, 'muscle_passive_component_check'),
+                'handler': self.muscle_passive_component_checked,
+                'status': False
+            } 
+        }
 
-        #textedit 정의
-        self.Desired_pos = self.findChild(QTextEdit, 'desired_pos')
-        self.Kp = self.findChild(QTextEdit, 'Pos_kp')
-        self.Ki = self.findChild(QTextEdit, 'Pos_ki')
-        self.Kd = self.findChild(QTextEdit, 'Pos_kd')
-        self.Neutral_angle = self.findChild(QTextEdit, 'Neutral_angle')
-        # self.vel_ki = self.findChild(QTextEdit, 'vel_ki')
-        # self.cur_kp = self.findChild(QTextEdit, 'cur_kp')
-        # self.cur_ki = self.findChild(QTextEdit, 'cur_ki')
+        # connect는 여기서만 한 번!
+        for info in self.checkboxes.values():
+            if info['widget'] is not None:
+                info['widget'].stateChanged.connect(info['handler'])
 
-        self.Kp.setPlainText(f"{self._RMD.Kp}")
-        self.Ki.setPlainText(f"{self._RMD.Ki}")
-        self.Kd.setPlainText(f"{self._RMD.Kd}")
-        self.Neutral_angle.setPlainText(f"{self._RMD.Neutral_angle}")
-        # self.vel_ki.setPlainText(f"{self._RMD.ki_vel}")
-        # self.cur_kp.setPlainText(f"{self._RMD.kp_cur}")
-        # self.cur_ki.setPlainText(f"{self._RMD.ki_cur}")
-
-
-        self.amplitude = self.findChild(QTextEdit, 'amplitude')
-        self.period = self.findChild(QTextEdit, 'period')
-        self.pos_offset = self.findChild(QTextEdit, 'pos_offset')
-
-        self.amplitude_ramp = self.findChild(QTextEdit, 'amplitude_ramp')
-        self.velocity_ramp = self.findChild(QTextEdit, 'velocity_ramp')
-        self.pos_offset_ramp = self.findChild(QTextEdit, 'pos_offset_ramp')
+        self.control_off()
 
         # buttons 정의
 
         self.system_quit_btn = self.findChild(QPushButton, 'system_quit_btn')
-
+        self.motor_on_off_btn = self.findChild(QPushButton, 'motor_on_off_btn')
         self.parameter_setting_btn = self.findChild(QPushButton, 'parameter_setting_btn')
-
-        self.pos_setting_btn = self.findChild(QPushButton, 'pos_setting_btn')
-        self.pos_start_btn = self.findChild(QPushButton, 'pos_start_btn')
-        self.pos_stop_btn = self.findChild(QPushButton, 'pos_stop_btn')
-
-        self.sinusoidal_setting_btn = self.findChild(QPushButton, 'sinusoidal_setting_btn')
-        self.sinusoidal_start_btn = self.findChild(QPushButton, 'sinusoidal_start_btn')
-        self.sinusoidal_stop_btn = self.findChild(QPushButton, 'sinusoidal_stop_btn')
-
-        self.ramp_setting_btn = self.findChild(QPushButton, 'ramp_setting_btn')
-        self.ramp_start_btn = self.findChild(QPushButton, 'ramp_start_btn')
-        self.ramp_stop_btn = self.findChild(QPushButton, 'ramp_stop_btn')
+        self.parameter_save_btn = self.findChild(QPushButton, 'parameter_save_btn')
 
         self.system_quit_btn.clicked.connect(self.system_quit_btn_clicked)
-
+        self.motor_on_off_btn.clicked.connect(self.motor_on_off_btn_clicked)
         self.parameter_setting_btn.clicked.connect(self.parameter_setting_btn_clicked)
-        
-        self.pos_setting_btn.clicked.connect(self.pos_setting_btn_clicked)
-        self.pos_start_btn.clicked.connect(self.pos_start_btn_clicked)
-        self.pos_stop_btn.clicked.connect(self.pos_stop_btn_clicked)
+        self.parameter_save_btn.clicked.connect(self.parameter_save_btn_clicked)
 
-        self.sinusoidal_setting_btn.clicked.connect(self.sinusoidal_setting_btn_clicked)
-        self.sinusoidal_start_btn.clicked.connect(self.sinusoidal_start_btn_clicked)
-        self.sinusoidal_stop_btn.clicked.connect(self.sinusoidal_stop_btn_clicked)
+        # 버튼 그룹별 정의
+        self.button_groups = {
+            'hydro': {
+                'hydrodynamic_test_setting_btn': self.hydrodynamic_test_setting_btn_clicked,
+                'hydrodynamic_test_start_btn': self.hydrodynamic_test_start_btn_clicked,
+                'hydrodynamic_test_stop_btn': self.hydrodynamic_test_stop_btn_clicked,
+            },
+            'angle': {
+                'angle_setting_btn': self.angle_setting_btn_clicked,
+                'angle_start_btn': self.angle_start_btn_clicked,
+                'angle_stop_btn': self.angle_stop_btn_clicked,
+            },
+            'muscle': {
+                'muscle_start_btn': self.muscle_start_btn_clicked,
+                'muscle_stop_btn': self.muscle_stop_btn_clicked,
+            }
+        }
 
-        self.ramp_setting_btn.clicked.connect(self.ramp_setting_btn_clicked)
-        self.ramp_start_btn.clicked.connect(self.ramp_start_btn_clicked)
-        self.ramp_stop_btn.clicked.connect(self.ramp_stop_btn_clicked)
+        # 위젯 객체 저장
+        self.button_widgets = {}
+
+        # findChild + connect
+        for group_name, btn_dict in self.button_groups.items():
+            for btn_name, handler in btn_dict.items():
+                btn = self.findChild(QPushButton, btn_name)
+                if btn:
+                    btn.clicked.connect(handler)
+                    self.button_widgets[btn_name] = btn
 
         self.btn_off()
 
-    def system_quit_btn_clicked(self):
-        self._RMD.RMD.raw_motor_off()
-        sys.exit()
-            # print(self._RMD.position_control_check_status, self._RMD.position_control_activate_status)
+        # QTextEdit 그룹별 정의
+        self.textedit_groups = {
+            'common': {
+                'rom_safe_upper': None,
+                'rom_safe_lower': None,
+                'perpendicular_angle': None,
+            },
+            'hydro': {
+                'desired_velocity_input': None,
+                'desired_acceleration_input': None,
+                'test_p_input': None,
+                'test_i_input': None,
+                'test_d_input': None,
+                'test_rom_upper_input': None,
+                'test_rom_lower_input': None,
+                'test_hold_time_input': None,
+            },
+            'angle': {
+                'desired_angle_input': None,
+            }
+        }
 
-    def parameter_setting_btn_clicked(self):
-        try:        
-                Kp = self.Kp.toPlainText()
-                Ki = self.Ki.toPlainText()
-                Kd = self.Kd.toPlainText()
-                neutral_angle = self.Neutral_angle.toPlainText()
-            
-                # ki_vel = self.vel_ki.toPlainText()
-                # kp_cur = self.cur_kp.toPlainText()
-                # ki_cur = self.cur_ki.toPlainText()
-                time.sleep(0.001)
-                self._RMD.Kp = float(Kp)
-                self._RMD.Ki = float(Ki)
-                self._RMD.Kd = float(Kd)
-                self._RMD.Neutral_angle = float(neutral_angle)
+        # 각 QTextEdit 위젯 findChild로 바인딩
+        for group in self.textedit_groups.values():
+            for name in group:
+                widget = self.findChild(QTextEdit, name)
+                group[name] = widget
 
-                data = {"kp": self._RMD.Kp, "ki": self._RMD.Ki, "kd": self._RMD.Kd, "neutral_angle": self._RMD.Neutral_angle}
-                with open("RMD/motor_info.json", "w") as fr:
-                    json.dump(data, fr)
-                # print(data)
-                # self._RMD.ki_vel = int(ki_vel)
-                # self._RMD.kp_cur = int(kp_cur)
-                # self._RMD.ki_cur = int(ki_cur)
-                # time.sleep(0.005)
-                # data = [
-                #     self._RMD.RMD.byteArray(self._RMD.kp_cur, 1),
-                #     self._RMD.RMD.byteArray(self._RMD.ki_cur, 1),
-                #     self._RMD.RMD.byteArray(self._RMD.kp_vel, 1),
-                #     self._RMD.RMD.byteArray(self._RMD.ki_vel, 1),
-                #     self._RMD.RMD.byteArray(self._RMD.kp_pos, 1),
-                #     self._RMD.RMD.byteArray(self._RMD.ki_pos, 1)
-                # ]
-                # # 바이트 배열을 하나의 플랫 리스트로 변환
-                # flat_data = [item for sublist in data for item in sublist]
-                # time.sleep(0.005)
-                # self._RMD.RMD.write_pid_ram(flat_data)
-                # print('setting complete')
-        except Exception as e:
-            traceback_message = traceback.format_exc()
-            print('error' + traceback_message)
-
-    def pos_setting_btn_clicked(self):
-        if self._RMD.position_control_check_status != False:
-            try:
-                pos = self.Desired_pos.toPlainText()
-                self._RMD.Desired_angle = float(pos)
-                print(f"position: {pos}")
-            except Exception as e:
-                    print(f"Error: {e}")
-            time.sleep(0.005)
-
-    def pos_start_btn_clicked(self):
-        if self._RMD.position_control_check_status != False:
-            self._RMD.position_control_activate_status = True
-            
-            # print(self._RMD.position_control_check_status, self._RMD.position_control_activate_status)
-
-    def pos_stop_btn_clicked(self):
-        if self._RMD.position_control_check_status != False:
-            self._RMD.position_control_activate_status = False
-
-    def sinusoidal_setting_btn_clicked(self):
-        if self._RMD.sinusoidal_control_check_status != False:
-            
-
-            amplitude = self.amplitude.toPlainText()
-            period = self.period.toPlainText()
-            pos_offset = self.pos_offset.toPlainText()
-            try:
-                self._RMD.amplitude_sine = float(amplitude)
-                self._RMD.period_sine = float(period)
-                self._RMD.pos_offset_sine = float(pos_offset)
-            except Exception as e:
-                print(f"Error: {e}")
-            except Exception as e:
-                print(f"Error: {e}")
-
-
-    def sinusoidal_start_btn_clicked(self):
-        if self._RMD.sinusoidal_control_check_status != False:
-            self._RMD.sinusoidal_control_activate_status = True
-            self._RMD.RMD_timer_sine = time.time()
-            self._RMD.state_sine = 1
-
-    def sinusoidal_stop_btn_clicked(self):
-        if self._RMD.sinusoidal_control_check_status != False:
-            self._RMD.sinusoidal_control_activate_status = False
-            self._RMD.state_sine = 1
-
-    def ramp_setting_btn_clicked(self):
-        if self._RMD.ramp_control_check_status != False:
-            amplitude_ramp = self.amplitude_ramp.toPlainText()
-            velocity_ramp = self.velocity_ramp.toPlainText()
-            pos_offset_ramp = self.pos_offset_ramp.toPlainText()
-            try:
-                self._RMD.amplitude_ramp = float(amplitude_ramp)
-                self._RMD.velocity_ramp = float(velocity_ramp)
-                self._RMD.pos_offset_ramp = float(pos_offset_ramp)
-                self._RMD.waypoint_ramp = float(pos_offset_ramp)
-            except Exception as e:
-                print(f"Error: {e}")
-
-
-    def ramp_start_btn_clicked(self):
-        if self._RMD.ramp_control_check_status != False:
-            self._RMD.ramp_control_activate_status = True
-            self._RMD.RMD_timer_ramp = time.time()
-            self._RMD.state_ramp = 1
-
-    def ramp_stop_btn_clicked(self):
-        if self._RMD.ramp_control_check_status != False:
-            self._RMD.ramp_control_activate_status = False
-            self._RMD.state_ramp = 1
-
+        self.QtextEdit_init()
     
-    
+    def QtextEdit_init(self):
+        # 각 QTextEdit 위젯에 초기값 설정
+        self.textedit_groups['common']['rom_safe_upper'].setPlainText(str(self.motor.common_dict['rom_safe_upper']))
+        self.textedit_groups['common']['rom_safe_lower'].setPlainText(str(self.motor.common_dict['rom_safe_lower']))
+        self.textedit_groups['common']['perpendicular_angle'].setPlainText(str(self.motor.common_dict['perpendicular_angle']))
+
+        self.textedit_groups['hydro']['desired_velocity_input'].setPlainText(str(self.motor.hydro_dict['desired_velocity_input']))
+        self.textedit_groups['hydro']['desired_acceleration_input'].setPlainText(str(self.motor.hydro_dict['desired_acceleration_input']))
+        self.textedit_groups['hydro']['test_p_input'].setPlainText(str(self.motor.hydro_dict['test_p_input']))
+        self.textedit_groups['hydro']['test_i_input'].setPlainText(str(self.motor.hydro_dict['test_i_input']))
+        self.textedit_groups['hydro']['test_d_input'].setPlainText(str(self.motor.hydro_dict['test_d_input']))
+        self.textedit_groups['hydro']['test_rom_upper_input'].setPlainText(str(self.motor.hydro_dict['test_rom_upper_input']))
+        self.textedit_groups['hydro']['test_rom_lower_input'].setPlainText(str(self.motor.hydro_dict['test_rom_lower_input']))
+        self.textedit_groups['hydro']['test_hold_time_input'].setPlainText(str(self.motor.hydro_dict['test_hold_time_input']))
+
+        self.textedit_groups['angle']['desired_angle_input'].setPlainText(str(self.motor.angle_dict['desired_angle_input']))
+        
     def control_on_off_changed(self, state):
         if state == Qt.Checked:
-            self._RMD.control_check_status = True
-            self.position_control_check.setEnabled(True)
-            self.sinusoidal_control_check.setEnabled(True)
-            self.ramp_control_check.setEnabled(True)
-            
-            # self.btn_on()
+            for info in self.checkboxes.values():
+                info['widget'].setEnabled(True)
+            self.control_on()
         else:
-            self._RMD.control_check_status = False
-            self._RMD.position_control_check_status = False
-            self._RMD.sinusoidal_control_check_status = False
-            self._RMD.ramp_control_check_status = False
-            self.position_control_check.setDisabled(True)
-            self.sinusoidal_control_check.setDisabled(True)
-            self.ramp_control_check.setDisabled(True)
-            # self.btn_off()
+            self.control_off()
 
-    def btn_on(self):
-        self.pos_setting_btn.setEnabled(True)
-        self.pos_start_btn.setEnabled(True)
-        self.pos_stop_btn.setEnabled(True)
-    
-        self.sinusoidal_setting_btn.setEnabled(True)
-        self.sinusoidal_start_btn.setEnabled(True)
-        self.sinusoidal_stop_btn.setEnabled(True)
+    def control_on(self):
+        for info in self.checkboxes.values():
+            if info['widget'] is not None:
+                info['widget'].setEnabled(True)
 
-        self.ramp_setting_btn.setEnabled(True)
-        self.ramp_start_btn.setEnabled(True)
-        self.ramp_stop_btn.setEnabled(True)
+    def control_off(self):
+        for info in self.checkboxes.values():
+            if info['widget'] is not None:
+                info['widget'].setDisabled(True)
 
-    def pos_btn_on(self):
-        self.pos_setting_btn.setEnabled(True)
-        self.pos_start_btn.setEnabled(True)
-        self.pos_stop_btn.setEnabled(True)
-    
-        self.sinusoidal_setting_btn.setDisabled(True)
-        self.sinusoidal_start_btn.setDisabled(True)
-        self.sinusoidal_stop_btn.setDisabled(True)
-
-        self.ramp_setting_btn.setDisabled(True)
-        self.ramp_start_btn.setDisabled(True)
-        self.ramp_stop_btn.setDisabled(True)
-
-    def sinusoidal_btn_on(self):
-        self.pos_setting_btn.setDisabled(True)
-        self.pos_start_btn.setDisabled(True)
-        self.pos_stop_btn.setDisabled(True)
-    
-        self.sinusoidal_setting_btn.setEnabled(True)
-        self.sinusoidal_start_btn.setEnabled(True)
-        self.sinusoidal_stop_btn.setEnabled(True)
-
-        self.ramp_setting_btn.setDisabled(True)
-        self.ramp_start_btn.setDisabled(True)
-        self.ramp_stop_btn.setDisabled(True)
-
-    def ramp_btn_on(self):
-        self.pos_setting_btn.setDisabled(True)
-        self.pos_start_btn.setDisabled(True)
-        self.pos_stop_btn.setDisabled(True)
-    
-        self.sinusoidal_setting_btn.setDisabled(True)
-        self.sinusoidal_start_btn.setDisabled(True)
-        self.sinusoidal_stop_btn.setDisabled(True)
-
-        self.ramp_setting_btn.setEnabled(True)
-        self.ramp_start_btn.setEnabled(True)
-        self.ramp_stop_btn.setEnabled(True)
-    
-    def btn_off(self):
-        self.pos_setting_btn.setDisabled(True)
-        self.pos_start_btn.setDisabled(True)
-        self.pos_stop_btn.setDisabled(True)
-    
-        self.sinusoidal_setting_btn.setDisabled(True)
-        self.sinusoidal_start_btn.setDisabled(True)
-        self.sinusoidal_stop_btn.setDisabled(True)
-
-        self.ramp_setting_btn.setDisabled(True)
-        self.ramp_start_btn.setDisabled(True)
-        self.ramp_stop_btn.setDisabled(True)
-
-    def position_control_checked(self, state):
+    def hydrodynamic_constant_velocity_checked(self, state):
         # state == 0 : unchecked, state == 2 : checked
         if state == Qt.Checked:
-            self._RMD.position_control_check_status = True
-            self._RMD.sinusoidal_control_check_status = False
-            self._RMD.ramp_control_check_status = False
-            self.pos_btn_on()
+            
+            self.enable_btn_group('hydro')
+            self.disable_btn_group('angle')
+            self.motor.motor_control_mode = 1
 
-            if self._RMD.sinusoidal_control_check_status == False and self.sinusoidal_control_check.checkState() == 2:
-                self.sinusoidal_control_check.toggle()
-                # print(self._RMD.position_control_check_status, self._RMD.sinusoidal_control_check_status)
-
-            if self._RMD.ramp_control_check_status == False and self.ramp_control_check.checkState() == 2:
-                self.ramp_control_check.toggle()
+            for name, info in self.checkboxes.items():                
+                if name == 'hydrodynamic_constant_velocity_check':
+                    info['status'] = True
+                else:
+                    if info['widget'].checkState() == 2:
+                        info['widget'].toggle()
+                    info['status'] = False
                 
         else:
-            self.position_control_check_status = False
+            for name, info in self.checkboxes.items():
+                if name == 'hydrodynamic_constant_velocity_check':
+                    info['status'] = False
+            self.disable_btn_group('hydro')
     
-    def sinusoidal_control_checked(self, state):
+    def hydrodynamic_constant_acceleration_checked(self, state):
         if state == Qt.Checked:
-            self._RMD.sinusoidal_control_check_status = True
-            self._RMD.position_control_check_status = False
-            self._RMD.ramp_control_check_status = False
-            self.sinusoidal_btn_on()
-            if self._RMD.position_control_check_status == False and self.position_control_check.checkState() == 2:
-                self.position_control_check.toggle()
-                # print(self._RMD.position_control_check_status, self._RMD.sinusoidal_control_check_status)
-            if self._RMD.ramp_control_check_status == False and self.ramp_control_check.checkState() == 2:
-                self.ramp_control_check.toggle()
-        else:
-            self.sinusoidal_control_check_status = False
+            
+            self.enable_btn_group('hydro')
+            self.disable_btn_group('angle')
+            self.motor.motor_control_mode = 2
 
-    def ramp_control_checked(self, state):
-        if state == Qt.Checked:
-            self._RMD.ramp_control_check_status = True
-            self._RMD.position_control_check_status = False
-            self._RMD.sinusoidal_control_check_status = False
-            self.ramp_btn_on()
-            if self._RMD.position_control_check_status == False and self.position_control_check.checkState() == 2:
-                self.position_control_check.toggle()
-                # print(self._RMD.position_control_check_status, self._RMD.sinusoidal_control_check_status)
-            if self._RMD.sinusoidal_control_check_status == False and self.sinusoidal_control_check.checkState() == 2:
-                self.sinusoidal_control_check.toggle()
+            for name, info in self.checkboxes.items():                
+                if name == 'hydrodynamic_constant_acceleration_check':
+                    info['status'] = True
+                else:
+                    if info['widget'].checkState() == 2:
+                        info['widget'].toggle()
+                    info['status'] = False
+                
         else:
-            self.ramp_control_check_status = False
+            for name, info in self.checkboxes.items():
+                if name == 'hydrodynamic_constant_acceleration_check':
+                    info['status'] = False
+            self.disable_btn_group('hydro')
+
+    def desired_angle_move_checked(self, state):
+        if state == Qt.Checked:
+            
+            self.disable_btn_group('hydro')
+            self.enable_btn_group('angle')
+            self.motor.motor_control_mode = 6
+
+            for name, info in self.checkboxes.items():                
+                if name == 'desired_angle_move_check':
+                    info['status'] = True
+                else:
+                    if info['widget'].checkState() == 2:
+                        info['widget'].toggle()
+                    info['status'] = False
+                
+        else:
+            for name, info in self.checkboxes.items():
+                if name == 'desired_angle_move_check':
+                    info['status'] = False
+            self.disable_btn_group('angle')
+
+    def muscle_passive_component_checked(self, state):
+        if state == Qt.Checked:
+            self.motor.muscle_passive_component_switch = 1
+            self.enable_btn_group('muscle')
+            for name, info in self.checkboxes.items():                
+                if name == 'muscle_passive_component_check':
+                    info['status'] = True
+
+        else:
+            self.motor.muscle_passive_component_switch = 0
+            self.disable_btn_group('muscle')
+            for name, info in self.checkboxes.items():                
+                if name == 'muscle_passive_component_check':
+                    info['status'] = False
+
+    def system_quit_btn_clicked(self):
+        self.motor.motor_power_enabled_pub = 0
+        time.sleep(0.5)
+        sys.exit()
+             
+    def motor_on_off_btn_clicked(self):
+        if self.motor.motor_power_enabled_pub == 1:
+            self.motor.motor_power_enabled_pub = 0
+        else:
+            self.motor.motor_power_enabled_pub = 1
+
+    def parameter_setting_btn_clicked(self):
+        common_dict = self.textedit_groups['common']
+
+        try:
+            self.motor.common_dict['rom_safe_upper'] = float(common_dict['rom_safe_upper'].toPlainText())
+            self.motor.common_dict['rom_safe_lower'] = float(common_dict['rom_safe_lower'].toPlainText())
+            self.motor.common_dict['perpendicular_angle'] = float(common_dict['perpendicular_angle'].toPlainText())
+
+        except Exception as e:
+            print(f"[RMD 설정 실패] {e}")
+
+    def parameter_save_btn_clicked(self):
+        data = {}
+        data['rom_safe_upper'] = self.motor.common_dict['rom_safe_upper']
+        data['rom_safe_lower'] = self.motor.common_dict['rom_safe_lower']
+        data['perpendicular_angle'] = self.motor.common_dict['perpendicular_angle']
+        data['desired_velocity_input'] = self.motor.hydro_dict['desired_velocity_input']
+        data['desired_acceleration_input'] = self.motor.hydro_dict['desired_acceleration_input']
+        data['test_p_input'] = self.motor.hydro_dict['test_p_input']
+        data['test_i_input'] = self.motor.hydro_dict['test_i_input']
+        data['test_d_input'] = self.motor.hydro_dict['test_d_input']
+        data['test_rom_upper_input'] = self.motor.hydro_dict['test_rom_upper_input']
+        data['test_rom_lower_input'] = self.motor.hydro_dict['test_rom_lower_input']
+        data['test_hold_time_input'] = self.motor.hydro_dict['test_hold_time_input']
+        data['desired_angle_input'] = self.motor.angle_dict['desired_angle_input']
+
+        with open("custom_json/motor_info.json", "w") as fw:
+            json.dump(data, fw, indent=4)
+
+    def hydrodynamic_test_setting_btn_clicked(self):
+        hydro_dict = self.textedit_groups['hydro']
+        try:
+            self.motor.hydro_dict['desired_velocity_input'] = float(hydro_dict['desired_velocity_input'].toPlainText())
+            self.motor.hydro_dict['desired_acceleration_input'] = float(hydro_dict['desired_acceleration_input'].toPlainText())
+            self.motor.hydro_dict['test_p_input'] = float(hydro_dict['test_p_input'].toPlainText())
+            self.motor.hydro_dict['test_i_input'] = float(hydro_dict['test_i_input'].toPlainText())
+            self.motor.hydro_dict['test_d_input'] = float(hydro_dict['test_d_input'].toPlainText())
+            self.motor.hydro_dict['test_rom_upper_input'] = float(hydro_dict['test_rom_upper_input'].toPlainText())
+            self.motor.hydro_dict['test_rom_lower_input'] = float(hydro_dict['test_rom_lower_input'].toPlainText())
+            self.motor.hydro_dict['test_hold_time_input'] = float(hydro_dict['test_hold_time_input'].toPlainText())
+        except Exception as e:
+            print(f"[RMD 설정 실패] {e}")   
+
+    def hydrodynamic_test_start_btn_clicked(self):
+        if self.checkboxes['hydrodynamic_constant_velocity_check']['status'] == True or self.checkboxes['hydrodynamic_constant_acceleration_check']['status'] == True:
+            self.motor.control_active_pub = 1
+
+    def hydrodynamic_test_stop_btn_clicked(self):
+        if self.checkboxes['hydrodynamic_constant_velocity_check']['status'] == True or self.checkboxes['hydrodynamic_constant_acceleration_check']['status'] == True:
+            self.motor.control_active_pub = 0
+
+    def angle_setting_btn_clicked(self):
+        angle_dict = self.textedit_groups['angle']
+        try:
+            self.motor.angle_dict['desired_angle_input'] = float(angle_dict['desired_angle_input'].toPlainText())
+        except Exception as e:
+            print(f"[RMD angle 설정 실패] {e}")
+
+    def angle_start_btn_clicked(self):
+        if self.checkboxes['desired_angle_move_check']['status'] == True:
+            self.motor.control_active_pub = 1
+
+    def angle_stop_btn_clicked(self):
+        if self.checkboxes['desired_angle_move_check']['status'] == True:
+            self.motor.control_active_pub = 0
+
+    def muscle_start_btn_clicked(self):
+        if self.checkboxes['muscle_passive_component_check']['status'] == True:
+            self.motor.control_active_pub = 1
+    
+    def muscle_stop_btn_clicked(self):
+        if self.checkboxes['muscle_passive_component_check']['status'] == True:
+            self.motor.control_active_pub = 0
+
+    def enable_btn_group(self, group_name):
+        if group_name in self.button_groups:
+            for btn_name in self.button_groups[group_name]:
+                self.button_widgets[btn_name].setEnabled(True)
+
+    def disable_btn_group(self, group_name):
+        if group_name in self.button_groups:
+            for btn_name in self.button_groups[group_name]:
+                self.button_widgets[btn_name].setDisabled(True)
+
+    def btn_on(self):
+        self.enable_btn_group('hydro')
+        self.enable_btn_group('angle')
+        self.enable_btn_group('muscle')
+    
+    def btn_off(self):
+        self.disable_btn_group('hydro')
+        self.disable_btn_group('angle')
+        self.disable_btn_group('muscle')
 
     def update_data(self):
-        Motor_angle = self._RMD.angle
-        Current_angle = self._RMD.knee_angle
-        Desired_angle = self._RMD.Desired_angle
-        torque = self._RMD.torque_out_info
 
-        velocity = self._RMD.velocity
-        self.Angle_text.setText(f"{Motor_angle:.2f}")
-        
-        # for i, label in enumerate(self.torque_labels):
-        self.Velocity_text.setText(f"{velocity:.2f}")
+        knee_angle = self.motor.knee_angle
+        velocity = self.motor.motor_velocity
+        motor_power_enabled_status = self.motor.motor_power_enabled_sub
+        motor_control_active = self.motor.control_active_sub
+
+        self.angle_text.setText(f"{knee_angle:.2f}")
+        self.velocity_text.setText(f"{velocity:.2f}")
+        self.motor_power_enabled_status_text.setText(f"{motor_power_enabled_status:.2f}")
+        self.motor_control_active_text.setText(f"{motor_control_active:.2f}")
 
 
-        ### 데이터 저장 및 그래프 업데이트 ###
-        # for i in range(3):
-        if len(self.Desired_Angle_list) >= self.threadhold:  # 최대 threadhold개 데이터 유지
-            self.Desired_Angle_list.pop(0)
-        if len(self.Speed_list) >= self.threadhold:  # 최대 threadhold개 데이터 유지
-            self.Speed_list.pop(0)
-        if len(self.Current_Angle_list) >= self.threadhold:
-            self.Current_Angle_list.pop(0)
-        if len(self.error_Angle_list) >= self.threadhold:
-            self.error_Angle_list.pop(0)
-        self.Desired_Angle_list.append(Desired_angle)
-        self.Current_Angle_list.append(Current_angle)
-        self.error_Angle_list.append(10*(Desired_angle - Current_angle))
-        self.Speed_list.append(torque)
-        self.Plot_Angle_desired_data.setData(self.Desired_Angle_list)
-        self.Plot_Angle_current_data.setData(self.Current_Angle_list)
-        # self.Plot_Angle_error_data.setData(self.error_Angle_list)
-        self.Plot_Velocity_data.setData(self.Speed_list)
+class Ros2Thread(QThread):
+    def __init__(self, node):
+        super().__init__()
+        self.node = node
+        self.executor = MultiThreadedExecutor()
 
-def run_node(node):
-    rclpy.spin(node)
+    def run(self):
+        self.executor.add_node(self.node)
+        try:
+            self.executor.spin()
+        finally:
+            self.executor.shutdown()
+
+    def stop(self):
+        self.executor.remove_node(self.node)
+        self.node.destroy_node()
 
 
 def main(args=None):
-
-
     def signal_handler(sig, frame):
         print("Shutting down...")
-        QApplication.quit()  # QApplication을 종료합니다.
+        QApplication.quit()
 
-    signal.signal(signal.SIGINT, signal_handler)  # SIGINT 신호를 처리하기 위해 핸들러를 등록합니다.
-    
+    signal.signal(signal.SIGINT, signal_handler)
+
     rclpy.init(args=args)
     motor = Motor()
-    thread = threading.Thread(target=run_node, args=(motor, ), daemon=True)
-    thread.start()
-    time.sleep(0.5)
-    
+    ros2_thread = Ros2Thread(motor)
+    ros2_thread.start()
+
     app = QApplication(sys.argv)
     main_window = MotorWindow(motor)
-    sys.exit(app.exec_())
 
+    try:
+        sys.exit(app.exec_())
+    finally:
+        ros2_thread.stop()
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
-    

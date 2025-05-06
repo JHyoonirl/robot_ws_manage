@@ -163,6 +163,44 @@ class RMD:
         message = [0x43, index[0], 0x00, 0x00,
                     data[0], data[1], data[2], data[3]]
         return self.send_cmd(message, 0.001)
+    
+    def motor_initialization(self):
+        """
+        Initialize the motor by setting the PID parameters and acceleration values.
+        """
+        response = self.read_pid()
+        init_data = response.data
+        self.kp_cur = init_data[2]
+        self.ki_cur = init_data[3]
+        self.kp_vel = init_data[4]
+        self.ki_vel = init_data[5]
+        self.kp_pos = init_data[6]
+        self.ki_pos = init_data[7]
+
+        print(self.kp_cur, self.ki_cur)
+        print(self.kp_vel, self.ki_vel)
+        print(self.kp_pos, self.ki_pos)
+        init_data = [
+            self.byteArray(self.kp_cur, 1) ,
+            self.byteArray(self.ki_cur, 1),
+            self.byteArray(self.kp_vel, 1),
+            self.byteArray(self.ki_vel, 1),
+            self.byteArray(self.kp_pos, 1),
+            self.byteArray(self.ki_pos, 1)
+        ]
+        # 바이트 배열을 하나의 플랫 리스트로 변환
+        flat_data = [item for sublist in init_data for item in sublist]
+        self.write_pid_ram(flat_data)
+
+        for i in range(4):
+            index = self.byteArray(i, 1)
+            response = self.read_acceleration(index)
+            data = response.data
+            acc = int.from_bytes(data[4:8], byteorder='little', signed=True)
+            input_acc = self.byteArray(60000, 4)
+            self.write_acceleration(index, input_acc)
+        print('Motor initialization complete')
+        return True
 
     def status_motor(self):
         '''
