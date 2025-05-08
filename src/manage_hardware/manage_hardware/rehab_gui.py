@@ -15,7 +15,7 @@ import signal
 
 
 
-class Motor(Node):
+class Rehab_program(Node):
     def __init__(self):
         
         '''
@@ -40,8 +40,8 @@ class Motor(Node):
         self.motor_common_parameter_publisher = self.create_publisher(
             Float64MultiArray, 'Motor_common_parameter', self.qos_profile)
 
-        self.motor_control_mode_publisher = self.create_publisher(
-            Float64MultiArray, 'Motor_control_mode', self.qos_profile)
+        self.control_mode_publisher = self.create_publisher(
+            Float64MultiArray, 'Control_mode', self.qos_profile)
 
         self.motor_hydrodynamic_control_publisher = self.create_publisher(
             Float64MultiArray, 'Motor_hydrodynamic_control_info', self.qos_profile)
@@ -53,15 +53,15 @@ class Motor(Node):
         self.knee_angle = 0.0
         self.motor_velocity = 0.0
 
-        self.motor_power_enabled_sub = 0
+        self.power_enabled_sub = 0
         '''
         0. off
         1. on
         '''
 
-        self.motor_power_enabled_pub = 0 # motor published control switch
+        self.power_enabled_pub = 0 # published control switch
 
-        self.motor_control_mode = 0
+        self.control_mode = 0
         '''
         1. extension constant velocity
         2. extension constant acceleration
@@ -98,11 +98,11 @@ class Motor(Node):
         
         self.angle_dict = {'desired_angle_input': motor_data['desired_angle_input']}
 
-        self.timer = self.create_timer(0.01, self.motor_control_pub)
+        self.timer = self.create_timer(0.01, self.rehab_control_pub)
 
-    def motor_control_pub(self):
+    def rehab_control_pub(self):
         self.motor_common_parameter_pub()
-        self.motor_control_mode_pub()
+        self.control_mode_pub()
         self.motor_hydrodynamic_pub()
         
     def motor_info_update_callback(self, msg):
@@ -117,7 +117,7 @@ class Motor(Node):
         knee_angle
         '''
 
-        self.motor_power_enabled_sub = msg[0]
+        self.power_enabled_sub = msg[0]
         self.control_active_sub = msg[1]
         self.motor_velocity = msg[4]
         self.knee_angle = msg[6]
@@ -135,16 +135,16 @@ class Motor(Node):
                     self.common_dict['perpendicular_angle']]
         self.motor_common_parameter_publisher.publish(msg)
 
-    def motor_control_mode_pub(self):
+    def control_mode_pub(self):
         '''
         motor_power_enabled
-        motor_control_mode 
+        control_mode 
         control_active 
         muscle_passive_component_switch
         '''
         msg = Float64MultiArray()
-        msg.data = [self.motor_power_enabled_pub, self.motor_control_mode, self.control_active_pub, self.muscle_passive_component_switch]
-        self.motor_control_mode_publisher.publish(msg)
+        msg.data = [self.power_enabled_pub, self.control_mode, self.control_active_pub, self.muscle_passive_component_switch]
+        self.control_mode_publisher.publish(msg)
 
     def motor_hydrodynamic_pub(self):
         msg = Float64MultiArray()
@@ -159,14 +159,15 @@ class Motor(Node):
         self.motor_hydrodynamic_control_publisher.publish(msg)
 
 
-class MotorWindow(QMainWindow):
-    def __init__(self, motor=Motor):
+class RehabWindow(QMainWindow):
+    def __init__(self, rehab=Rehab_program):
         QMainWindow.__init__(self)
         # self.rmd = RMD(port='COM3')  # 포트는 환경에 따라 변경
-        self.motor = motor
+        self.rehab = rehab
 
-        self.ui = uic.loadUi('UI/motor_gui.ui', self)
+        self.ui = uic.loadUi('UI/rehab_gui.ui', self)
 
+        self.move(0,0)
         self.initUI()
         self.show()
 
@@ -175,8 +176,8 @@ class MotorWindow(QMainWindow):
         # textbrowser 위젲
         self.angle_text = self.findChild(QTextBrowser, 'angle_data')
         self.velocity_text = self.findChild(QTextBrowser, 'velocity_data')
-        self.motor_power_enabled_status_text = self.findChild(QTextBrowser, 'motor_power_enabled_status')
-        self.motor_control_active_text = self.findChild(QTextBrowser, 'motor_control_active')
+        self.power_enabled_status_text = self.findChild(QTextBrowser, 'power_enabled_status')
+        self.control_active_text = self.findChild(QTextBrowser, 'control_active')
 
         ### 타이머 설정 ###
         self.timer = QTimer(self)
@@ -222,12 +223,12 @@ class MotorWindow(QMainWindow):
         # buttons 정의
 
         self.system_quit_btn = self.findChild(QPushButton, 'system_quit_btn')
-        self.motor_on_off_btn = self.findChild(QPushButton, 'motor_on_off_btn')
+        self.power_on_off_btn = self.findChild(QPushButton, 'power_on_off_btn')
         self.parameter_setting_btn = self.findChild(QPushButton, 'parameter_setting_btn')
         self.parameter_save_btn = self.findChild(QPushButton, 'parameter_save_btn')
 
         self.system_quit_btn.clicked.connect(self.system_quit_btn_clicked)
-        self.motor_on_off_btn.clicked.connect(self.motor_on_off_btn_clicked)
+        self.power_on_off_btn.clicked.connect(self.power_on_off_btn_clicked)
         self.parameter_setting_btn.clicked.connect(self.parameter_setting_btn_clicked)
         self.parameter_save_btn.clicked.connect(self.parameter_save_btn_clicked)
 
@@ -294,20 +295,20 @@ class MotorWindow(QMainWindow):
     
     def QtextEdit_init(self):
         # 각 QTextEdit 위젯에 초기값 설정
-        self.textedit_groups['common']['rom_safe_upper'].setPlainText(str(self.motor.common_dict['rom_safe_upper']))
-        self.textedit_groups['common']['rom_safe_lower'].setPlainText(str(self.motor.common_dict['rom_safe_lower']))
-        self.textedit_groups['common']['perpendicular_angle'].setPlainText(str(self.motor.common_dict['perpendicular_angle']))
+        self.textedit_groups['common']['rom_safe_upper'].setPlainText(str(self.rehab.common_dict['rom_safe_upper']))
+        self.textedit_groups['common']['rom_safe_lower'].setPlainText(str(self.rehab.common_dict['rom_safe_lower']))
+        self.textedit_groups['common']['perpendicular_angle'].setPlainText(str(self.rehab.common_dict['perpendicular_angle']))
 
-        self.textedit_groups['hydro']['desired_velocity_input'].setPlainText(str(self.motor.hydro_dict['desired_velocity_input']))
-        self.textedit_groups['hydro']['desired_acceleration_input'].setPlainText(str(self.motor.hydro_dict['desired_acceleration_input']))
-        self.textedit_groups['hydro']['test_p_input'].setPlainText(str(self.motor.hydro_dict['test_p_input']))
-        self.textedit_groups['hydro']['test_i_input'].setPlainText(str(self.motor.hydro_dict['test_i_input']))
-        self.textedit_groups['hydro']['test_d_input'].setPlainText(str(self.motor.hydro_dict['test_d_input']))
-        self.textedit_groups['hydro']['test_rom_upper_input'].setPlainText(str(self.motor.hydro_dict['test_rom_upper_input']))
-        self.textedit_groups['hydro']['test_rom_lower_input'].setPlainText(str(self.motor.hydro_dict['test_rom_lower_input']))
-        self.textedit_groups['hydro']['test_hold_time_input'].setPlainText(str(self.motor.hydro_dict['test_hold_time_input']))
+        self.textedit_groups['hydro']['desired_velocity_input'].setPlainText(str(self.rehab.hydro_dict['desired_velocity_input']))
+        self.textedit_groups['hydro']['desired_acceleration_input'].setPlainText(str(self.rehab.hydro_dict['desired_acceleration_input']))
+        self.textedit_groups['hydro']['test_p_input'].setPlainText(str(self.rehab.hydro_dict['test_p_input']))
+        self.textedit_groups['hydro']['test_i_input'].setPlainText(str(self.rehab.hydro_dict['test_i_input']))
+        self.textedit_groups['hydro']['test_d_input'].setPlainText(str(self.rehab.hydro_dict['test_d_input']))
+        self.textedit_groups['hydro']['test_rom_upper_input'].setPlainText(str(self.rehab.hydro_dict['test_rom_upper_input']))
+        self.textedit_groups['hydro']['test_rom_lower_input'].setPlainText(str(self.rehab.hydro_dict['test_rom_lower_input']))
+        self.textedit_groups['hydro']['test_hold_time_input'].setPlainText(str(self.rehab.hydro_dict['test_hold_time_input']))
 
-        self.textedit_groups['angle']['desired_angle_input'].setPlainText(str(self.motor.angle_dict['desired_angle_input']))
+        self.textedit_groups['angle']['desired_angle_input'].setPlainText(str(self.rehab.angle_dict['desired_angle_input']))
         
     def control_on_off_changed(self, state):
         if state == Qt.Checked:
@@ -333,7 +334,7 @@ class MotorWindow(QMainWindow):
             
             self.enable_btn_group('hydro')
             self.disable_btn_group('angle')
-            self.motor.motor_control_mode = 1
+            self.rehab.control_mode = 1
 
             for name, info in self.checkboxes.items():                
                 if name == 'hydrodynamic_constant_velocity_check':
@@ -354,7 +355,7 @@ class MotorWindow(QMainWindow):
             
             self.enable_btn_group('hydro')
             self.disable_btn_group('angle')
-            self.motor.motor_control_mode = 2
+            self.rehab.control_mode = 2
 
             for name, info in self.checkboxes.items():                
                 if name == 'hydrodynamic_constant_acceleration_check':
@@ -375,7 +376,7 @@ class MotorWindow(QMainWindow):
             
             self.disable_btn_group('hydro')
             self.enable_btn_group('angle')
-            self.motor.motor_control_mode = 6
+            self.rehab.control_mode = 6
 
             for name, info in self.checkboxes.items():                
                 if name == 'desired_angle_move_check':
@@ -393,55 +394,55 @@ class MotorWindow(QMainWindow):
 
     def muscle_passive_component_checked(self, state):
         if state == Qt.Checked:
-            self.motor.muscle_passive_component_switch = 1
+            self.rehab.muscle_passive_component_switch = 1
             self.enable_btn_group('muscle')
             for name, info in self.checkboxes.items():                
                 if name == 'muscle_passive_component_check':
                     info['status'] = True
 
         else:
-            self.motor.muscle_passive_component_switch = 0
+            self.rehab.muscle_passive_component_switch = 0
             self.disable_btn_group('muscle')
             for name, info in self.checkboxes.items():                
                 if name == 'muscle_passive_component_check':
                     info['status'] = False
 
     def system_quit_btn_clicked(self):
-        self.motor.motor_power_enabled_pub = 0
+        self.rehab.power_enabled_pub = 0
         time.sleep(0.5)
         sys.exit()
              
-    def motor_on_off_btn_clicked(self):
-        if self.motor.motor_power_enabled_pub == 1:
-            self.motor.motor_power_enabled_pub = 0
+    def power_on_off_btn_clicked(self):
+        if self.rehab.power_enabled_pub == 1:
+            self.rehab.power_enabled_pub = 0
         else:
-            self.motor.motor_power_enabled_pub = 1
+            self.rehab.power_enabled_pub = 1
 
     def parameter_setting_btn_clicked(self):
         common_dict = self.textedit_groups['common']
 
         try:
-            self.motor.common_dict['rom_safe_upper'] = float(common_dict['rom_safe_upper'].toPlainText())
-            self.motor.common_dict['rom_safe_lower'] = float(common_dict['rom_safe_lower'].toPlainText())
-            self.motor.common_dict['perpendicular_angle'] = float(common_dict['perpendicular_angle'].toPlainText())
+            self.rehab.common_dict['rom_safe_upper'] = float(common_dict['rom_safe_upper'].toPlainText())
+            self.rehab.common_dict['rom_safe_lower'] = float(common_dict['rom_safe_lower'].toPlainText())
+            self.rehab.common_dict['perpendicular_angle'] = float(common_dict['perpendicular_angle'].toPlainText())
 
         except Exception as e:
             print(f"[RMD 설정 실패] {e}")
 
     def parameter_save_btn_clicked(self):
         data = {}
-        data['rom_safe_upper'] = self.motor.common_dict['rom_safe_upper']
-        data['rom_safe_lower'] = self.motor.common_dict['rom_safe_lower']
-        data['perpendicular_angle'] = self.motor.common_dict['perpendicular_angle']
-        data['desired_velocity_input'] = self.motor.hydro_dict['desired_velocity_input']
-        data['desired_acceleration_input'] = self.motor.hydro_dict['desired_acceleration_input']
-        data['test_p_input'] = self.motor.hydro_dict['test_p_input']
-        data['test_i_input'] = self.motor.hydro_dict['test_i_input']
-        data['test_d_input'] = self.motor.hydro_dict['test_d_input']
-        data['test_rom_upper_input'] = self.motor.hydro_dict['test_rom_upper_input']
-        data['test_rom_lower_input'] = self.motor.hydro_dict['test_rom_lower_input']
-        data['test_hold_time_input'] = self.motor.hydro_dict['test_hold_time_input']
-        data['desired_angle_input'] = self.motor.angle_dict['desired_angle_input']
+        data['rom_safe_upper'] = self.rehab.common_dict['rom_safe_upper']
+        data['rom_safe_lower'] = self.rehab.common_dict['rom_safe_lower']
+        data['perpendicular_angle'] = self.rehab.common_dict['perpendicular_angle']
+        data['desired_velocity_input'] = self.rehab.hydro_dict['desired_velocity_input']
+        data['desired_acceleration_input'] = self.rehab.hydro_dict['desired_acceleration_input']
+        data['test_p_input'] = self.rehab.hydro_dict['test_p_input']
+        data['test_i_input'] = self.rehab.hydro_dict['test_i_input']
+        data['test_d_input'] = self.rehab.hydro_dict['test_d_input']
+        data['test_rom_upper_input'] = self.rehab.hydro_dict['test_rom_upper_input']
+        data['test_rom_lower_input'] = self.rehab.hydro_dict['test_rom_lower_input']
+        data['test_hold_time_input'] = self.rehab.hydro_dict['test_hold_time_input']
+        data['desired_angle_input'] = self.rehab.angle_dict['desired_angle_input']
 
         with open("custom_json/motor_info.json", "w") as fw:
             json.dump(data, fw, indent=4)
@@ -449,47 +450,47 @@ class MotorWindow(QMainWindow):
     def hydrodynamic_test_setting_btn_clicked(self):
         hydro_dict = self.textedit_groups['hydro']
         try:
-            self.motor.hydro_dict['desired_velocity_input'] = float(hydro_dict['desired_velocity_input'].toPlainText())
-            self.motor.hydro_dict['desired_acceleration_input'] = float(hydro_dict['desired_acceleration_input'].toPlainText())
-            self.motor.hydro_dict['test_p_input'] = float(hydro_dict['test_p_input'].toPlainText())
-            self.motor.hydro_dict['test_i_input'] = float(hydro_dict['test_i_input'].toPlainText())
-            self.motor.hydro_dict['test_d_input'] = float(hydro_dict['test_d_input'].toPlainText())
-            self.motor.hydro_dict['test_rom_upper_input'] = float(hydro_dict['test_rom_upper_input'].toPlainText())
-            self.motor.hydro_dict['test_rom_lower_input'] = float(hydro_dict['test_rom_lower_input'].toPlainText())
-            self.motor.hydro_dict['test_hold_time_input'] = float(hydro_dict['test_hold_time_input'].toPlainText())
+            self.rehab.hydro_dict['desired_velocity_input'] = float(hydro_dict['desired_velocity_input'].toPlainText())
+            self.rehab.hydro_dict['desired_acceleration_input'] = float(hydro_dict['desired_acceleration_input'].toPlainText())
+            self.rehab.hydro_dict['test_p_input'] = float(hydro_dict['test_p_input'].toPlainText())
+            self.rehab.hydro_dict['test_i_input'] = float(hydro_dict['test_i_input'].toPlainText())
+            self.rehab.hydro_dict['test_d_input'] = float(hydro_dict['test_d_input'].toPlainText())
+            self.rehab.hydro_dict['test_rom_upper_input'] = float(hydro_dict['test_rom_upper_input'].toPlainText())
+            self.rehab.hydro_dict['test_rom_lower_input'] = float(hydro_dict['test_rom_lower_input'].toPlainText())
+            self.rehab.hydro_dict['test_hold_time_input'] = float(hydro_dict['test_hold_time_input'].toPlainText())
         except Exception as e:
             print(f"[RMD 설정 실패] {e}")   
 
     def hydrodynamic_test_start_btn_clicked(self):
         if self.checkboxes['hydrodynamic_constant_velocity_check']['status'] == True or self.checkboxes['hydrodynamic_constant_acceleration_check']['status'] == True:
-            self.motor.control_active_pub = 1
+            self.rehab.control_active_pub = 1
 
     def hydrodynamic_test_stop_btn_clicked(self):
         if self.checkboxes['hydrodynamic_constant_velocity_check']['status'] == True or self.checkboxes['hydrodynamic_constant_acceleration_check']['status'] == True:
-            self.motor.control_active_pub = 0
+            self.rehab.control_active_pub = 0
 
     def angle_setting_btn_clicked(self):
         angle_dict = self.textedit_groups['angle']
         try:
-            self.motor.angle_dict['desired_angle_input'] = float(angle_dict['desired_angle_input'].toPlainText())
+            self.rehab.angle_dict['desired_angle_input'] = float(angle_dict['desired_angle_input'].toPlainText())
         except Exception as e:
             print(f"[RMD angle 설정 실패] {e}")
 
     def angle_start_btn_clicked(self):
         if self.checkboxes['desired_angle_move_check']['status'] == True:
-            self.motor.control_active_pub = 1
+            self.rehab.control_active_pub = 1
 
     def angle_stop_btn_clicked(self):
         if self.checkboxes['desired_angle_move_check']['status'] == True:
-            self.motor.control_active_pub = 0
+            self.rehab.control_active_pub = 0
 
     def muscle_start_btn_clicked(self):
         if self.checkboxes['muscle_passive_component_check']['status'] == True:
-            self.motor.control_active_pub = 1
+            self.rehab.control_active_pub = 1
     
     def muscle_stop_btn_clicked(self):
         if self.checkboxes['muscle_passive_component_check']['status'] == True:
-            self.motor.control_active_pub = 0
+            self.rehab.control_active_pub = 0
 
     def enable_btn_group(self, group_name):
         if group_name in self.button_groups:
@@ -513,15 +514,15 @@ class MotorWindow(QMainWindow):
 
     def update_data(self):
 
-        knee_angle = self.motor.knee_angle
-        velocity = self.motor.motor_velocity
-        motor_power_enabled_status = self.motor.motor_power_enabled_sub
-        motor_control_active = self.motor.control_active_sub
+        knee_angle = self.rehab.knee_angle
+        velocity = self.rehab.motor_velocity
+        power_enabled_status = self.rehab.power_enabled_sub
+        motor_control_active = self.rehab.control_active_sub
 
         self.angle_text.setText(f"{knee_angle:.2f}")
         self.velocity_text.setText(f"{velocity:.2f}")
-        self.motor_power_enabled_status_text.setText(f"{motor_power_enabled_status:.2f}")
-        self.motor_control_active_text.setText(f"{motor_control_active:.2f}")
+        self.power_enabled_status_text.setText(f"{power_enabled_status:.2f}")
+        self.control_active_text.setText(f"{motor_control_active:.2f}")
 
 
 class Ros2Thread(QThread):
@@ -550,12 +551,12 @@ def main(args=None):
     signal.signal(signal.SIGINT, signal_handler)
 
     rclpy.init(args=args)
-    motor = Motor()
-    ros2_thread = Ros2Thread(motor)
+    rehab_program = Rehab_program()
+    ros2_thread = Ros2Thread(rehab_program)
     ros2_thread.start()
 
     app = QApplication(sys.argv)
-    main_window = MotorWindow(motor)
+    main_window = RehabWindow(rehab_program)
 
     try:
         sys.exit(app.exec_())

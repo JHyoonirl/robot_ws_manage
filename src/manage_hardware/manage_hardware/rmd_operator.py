@@ -73,18 +73,18 @@ class Motor(Node):
 
         
         self.power_locked = False  # 안전장치 잠금 상태
-        self.raw_motor_power_enabled = 0
-        self.raw_motor_power_enabled_prev = 0  # 이전 입력 상태 추적
+        self.raw_power_enabled = 0
+        self.raw_power_enabled_prev = 0  # 이전 입력 상태 추적
 
 
-        self.motor_power_enabled = 0
+        self.power_enabled = 0
         '''
         0. off
         1. on
         '''
-        self.motor_power_enabled_prev = None
+        self.power_enabled_prev = None
 
-        self.motor_control_mode = 0
+        self.control_mode = 0
         '''
         1. extension constant velocity
         2. extension constant acc
@@ -117,8 +117,8 @@ class Motor(Node):
         self.motor_common_parameter_subscriber = self.create_subscription(
             Float64MultiArray, 'Motor_common_parameter', self.motor_common_parameter_callback, self.qos_profile
         )
-        self.motor_control_mode_subscriber = self.create_subscription(
-            Float64MultiArray, 'Motor_control_mode', self.motor_control_mode_callback, self.qos_profile
+        self.control_mode_subscriber = self.create_subscription(
+            Float64MultiArray, 'Control_mode', self.control_mode_callback, self.qos_profile
         )
         self.motor_desired_trajectory_angle_subscriber = self.create_subscription(
             Float64, 'desired_angle', self.motor_desired_trajectory_callback, self.qos_profile
@@ -138,11 +138,11 @@ class Motor(Node):
 
         # Control Switch Inputs
         
-        self.motor_control_mode_info = [0.0, 0.0, 0.0, 0.0]  
+        self.control_mode_info = [0.0, 0.0, 0.0, 0.0]  
         '''
         motor control mode setting parameter
 
-        [main control switch, control mode switch, control status, muscle switch]
+        [power_enabled, control_mode, control_active, muscle_passive_component_switch]
         '''
         
         # Hydrodynamic test setup
@@ -199,7 +199,7 @@ class Motor(Node):
 
 
         motor_info = Float64MultiArray()
-        motor_info.data = [self.motor_power_enabled, self.control_active, self.voltage, self.torque_current, self.motor_velocity, self.motor_angle, self.motor_knee_angle]
+        motor_info.data = [self.power_enabled, self.control_active, self.voltage, self.torque_current, self.motor_velocity, self.motor_angle, self.motor_knee_angle]
         self.motor_info_publisher.publish(motor_info)
 
     def motor_control(self):
@@ -207,51 +207,51 @@ class Motor(Node):
         try:
             motor_knee_angle = self.motor_knee_angle
             if motor_knee_angle > self.rom_safe_upper or motor_knee_angle < self.rom_safe_lower:
-                self.motor_power_enabled = 0
+                self.power_enabled = 0
                 self.power_locked = True
                 
-            if self.motor_power_enabled == 0:
+            if self.power_enabled == 0:
                 
-                if self.motor_power_enabled_prev == self.motor_power_enabled:
-                    return self.motor_power_enabled
+                if self.power_enabled_prev == self.power_enabled:
+                    return self.power_enabled
                 else:
-                    self.motor_power_enabled_prev = self.motor_power_enabled
+                    self.power_enabled_prev = self.power_enabled
                     
                 self.RMD.raw_motor_off()
                 self.get_logger().info('Motor off')
                 time.sleep(0.005)
                 
-                return self.motor_power_enabled
+                return self.power_enabled
             
             if self.control_active != 1:
-                return self.motor_power_enabled
+                return self.power_enabled
             
             if self.muscle_passive_component_switch == 1:
                 torque = self.muscle.M_passive(self.motor_knee_angle, self.motor_velocity)
-                self.get_logger().info(f"muscle passive torque: {torque}")
+                # self.get_logger().info(f"muscle passive torque: {torque}")
                 torque_LSB = self.muscle.torque_to_LSB(torque)
-                self.get_logger().info(f"muscle passive torque LSB: {torque_LSB}")
+                # self.get_logger().info(f"muscle passive torque LSB: {torque_LSB}")
                 self.RMD.torque_closed_loop(int(torque_LSB))
-            if self.motor_control_mode == 1: # 등각속도 운동
+            if self.control_mode == 1: # 등각속도 운동
                 self.motor_constant_velocity()
-            elif self.motor_control_mode == 2: # 등각가속도 운동
+            elif self.control_mode == 2: # 등각가속도 운동
                 # pass
                 self.motor_constant_acc()
-            elif self.motor_control_mode == 3: # passive exercise
+            elif self.control_mode == 3: # passive exercise
                 pass
                 # self.motor_passive()
-            elif self.motor_control_mode == 4: # resistance exercise
+            elif self.control_mode == 4: # resistance exercise
                 pass
                 # self.motor_resistance()
-            elif self.motor_control_mode == 5: # assistance exercise
+            elif self.control_mode == 5: # assistance exercise
                 pass
                 # self.motor_assistance()
-            elif self.motor_control_mode == 6: # angle move
+            elif self.control_mode == 6: # angle move
                 pass
                 # self.motor_angle_move()
             self.past_time = time.time()
-            self.motor_power_enabled_prev = self.motor_power_enabled
-            return self.motor_power_enabled
+            self.power_enabled_prev = self.power_enabled
+            return self.power_enabled
         except Exception as e:
             print(f'Error - motor control -: {e}')
             self.RMD.raw_motor_off()
@@ -357,34 +357,34 @@ class Motor(Node):
         self.rom_safe_lower = msg.data[1] # motor의 안전 lower ROM
         self.perpendicular_angle = msg.data[2] # 무릎의 90도에 해당하는 motor encoder의 각도
 
-    def motor_control_mode_callback(self, msg):
+    def control_mode_callback(self, msg):
         try:
-            self.motor_control_mode_info = msg.data
-            raw_input = int(self.motor_control_mode_info[0])
+            self.control_mode_info = msg.data
+            raw_input = int(self.control_mode_info[0])
 
-            if raw_input == 1 and self.raw_motor_power_enabled_prev == 0:
+            if raw_input == 1 and self.raw_power_enabled_prev == 0:
                 if self.power_locked:
                     self.get_logger().info("Safety lock released.")
 
                 self.power_locked = False
 
-            self.raw_motor_power_enabled_prev = raw_input
+            self.raw_power_enabled_prev = raw_input
 
             if not self.power_locked:
-                self.motor_power_enabled = raw_input
+                self.power_enabled = raw_input
             else:
                 self.get_logger().warn("Motor power is locked due to safety trigger.")
 
             
-            if self.motor_power_enabled == 1:
-                self.motor_control_mode = int(self.motor_control_mode_info[1])
-                self.control_active = int(self.motor_control_mode_info[2])
+            if self.power_enabled == 1:
+                self.control_mode = int(self.control_mode_info[1])
+                self.control_active = int(self.control_mode_info[2])
                 if self.control_active == 1 and self.control_active_prev != self.control_active:
                     self.control_time_stamp = time.time()
                 self.control_active_prev = self.control_active
-                self.muscle_passive_component_switch = int(self.motor_control_mode_info[3])
+                self.muscle_passive_component_switch = int(self.control_mode_info[3])
             else:
-                self.motor_control_mode = 0
+                self.control_mode = 0
                 self.control_active = 0
                 self.control_active_prev = 0
                 self.muscle_passive_component_switch = 0
@@ -446,4 +446,4 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-    
+

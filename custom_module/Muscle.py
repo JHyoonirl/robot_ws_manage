@@ -61,18 +61,27 @@ class Muscle:
             '''
             rad_angle = np.deg2rad(angle)
             if angle <= 90:
-                coef = -0.237 * rad_angle  + 1.12
+                coef = -0.237 * rad_angle + 1.12
             else:
-                coef = 1.6* rad_angle ** 2 - 4.87* rad_angle + 4.44
+                coef = 1.6 * rad_angle ** 2 - 4.87 * rad_angle + 4.44
             return coef
-        rad_velocity = np.deg2rad(velocity)
-        torque = damping_coef(angle) * rad_velocity
 
+        rad_velocity = np.deg2rad(velocity)
+        damping_coefficient = damping_coef(angle)
+
+        # Adjust damping coefficient based on velocity direction
+        # if rad_velocity < 0:
+        #     damping_coefficient = -damping_coefficient
+
+        torque = -100*damping_coefficient * rad_velocity  # Use absolute value of velocity
         return torque
     
     def M_passive(self, angle, velocity) -> float:
 
-        total_torque = self.M_damping(angle, velocity) + self.M_stiffness(angle)
+        total_torque = self.M_stiffness(angle) 
+        damping_torque = self.M_damping(angle, velocity)
+        print("damping_torque", damping_torque)
+        
         return float(total_torque)
     
     def torque_to_LSB(self, torque:float)-> int:
@@ -82,6 +91,6 @@ class Muscle:
         LSB torque constant : 312.5 LSB/Nm
         torque : Unit[Nm]
         '''
-        LSB_torque_constant = 10
+        LSB_torque_constant = 20
         LSB_input = LSB_torque_constant * torque
         return int(LSB_input)
