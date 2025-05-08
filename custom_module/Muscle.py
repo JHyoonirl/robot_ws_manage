@@ -37,7 +37,7 @@ class Muscle:
         elif angle >= 55 and angle < 95:
             torque = -2.48*rad_angle + 2.84
         elif angle >= 95 and angle < 155:
-            torque = -0.02*np.exp(0.25*rad_angle)
+            torque = -0.02*np.exp(2.5*rad_angle)
         else:
             torque = 0
             
@@ -73,7 +73,7 @@ class Muscle:
         # if rad_velocity < 0:
         #     damping_coefficient = -damping_coefficient
 
-        torque = -100*damping_coefficient * rad_velocity  # Use absolute value of velocity
+        torque = - damping_coefficient * rad_velocity  # Use absolute value of velocity
         return torque
     
     def M_passive(self, angle, velocity) -> float:
