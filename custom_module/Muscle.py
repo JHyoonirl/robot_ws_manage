@@ -78,9 +78,7 @@ class Muscle:
     
     def M_passive(self, angle, velocity) -> float:
 
-        total_torque = self.M_stiffness(angle) 
-        damping_torque = self.M_damping(angle, velocity)
-        print("damping_torque", damping_torque)
+        total_torque = self.M_stiffness(angle) + self.M_damping(angle, velocity)
         
         return float(total_torque)
     
@@ -91,6 +89,6 @@ class Muscle:
         LSB torque constant : 312.5 LSB/Nm
         torque : Unit[Nm]
         '''
-        LSB_torque_constant = 20
+        LSB_torque_constant = 85
         LSB_input = LSB_torque_constant * torque
         return int(LSB_input)

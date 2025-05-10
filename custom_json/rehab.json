@@ -1,1 +1,45 @@
-{"theta_min": 40.0, "theta_max": 130.0, "dtheta_max": 30.0, "ddtheta_max": 20.0, "acc_time": 1.0, "repeatation_number": 20.0, "thruster_acc": 1.0, "hold_time": 3.0, "kp_passive": 10.0, "ki_passive": 20.0, "kd_passive": 0.0, "m_resistance": 1.0, "kp_assistance": 1.0, "ki_assistance": 0.0, "kd_assistance": 0.1}
+{
+    "exercise_parameter": {
+        "desired_velocity": 20.0,
+        "desired_acceleration": 5.0,
+        "repeatation_number": 10,
+        "hold_time": 3.0,
+        "rom_upper": 120.0,
+        "rom_lower": 40.0
+    },
+    "passive_parameter": {
+        "passive_p": 1.0,
+        "passive_i": 0.05,
+        "passive_d": 0.01
+    },
+    "assistance_parameter": {
+        "assistance_gain_k": 1.5,
+        "assistance_p": 0.3,
+        "assistance_i": 0.02,
+        "assistance_d": 0.005,
+        "assistance_muscle_p": 0.25,
+        "assistance_muscle_i": 0.015,
+        "assistance_muscle_d": 0.004
+    },
+    "resistance_parameter": {
+        "resistance_moment": 0.35,
+        "resistance_muscle_p": 0.3,
+        "resistance_muscle_i": 0.01,
+        "resistance_muscle_d": 0.002
+    },
+    "motor_setting_parameter": {
+        "rom_safe_upper": 130.0,
+        "rom_safe_lower": 45.0,
+        "perpendicular_angle": 115.0
+    },
+    "hydrodynamic_parameter": {
+        "test_velocity_input": 15.0,
+        "test_acceleration_input": 4.0,
+        "test_p_input": 0.8,
+        "test_i_input": 0.03,
+        "test_d_input": 0.007,
+        "test_rom_upper_input": 125.0,
+        "test_rom_lower_input": 50.0,
+        "test_hold_time_input": 2.0
+    }
+}

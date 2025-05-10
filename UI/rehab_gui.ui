@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>748</width>
-    <height>799</height>
+    <height>842</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -27,17 +27,20 @@
      <string>Quit</string>
     </property>
    </widget>
-   <widget class="QTabWidget" name="tabWidget">
+   <widget class="QTabWidget" name="exercise">
     <property name="geometry">
      <rect>
       <x>20</x>
       <y>310</y>
-      <width>681</width>
-      <height>431</height>
+      <width>711</width>
+      <height>471</height>
      </rect>
     </property>
+    <property name="tabShape">
+     <enum>QTabWidget::Rounded</enum>
+    </property>
     <property name="currentIndex">
-     <number>0</number>
+     <number>1</number>
     </property>
     <widget class="QWidget" name="tab">
      <attribute name="title">
@@ -47,7 +50,7 @@
       <property name="geometry">
        <rect>
         <x>610</x>
-        <y>150</y>
+        <y>170</y>
         <width>51</width>
         <height>31</height>
        </rect>
@@ -57,7 +60,7 @@
       <property name="geometry">
        <rect>
         <x>580</x>
-        <y>350</y>
+        <y>390</y>
         <width>91</width>
         <height>23</height>
        </rect>
@@ -70,17 +73,17 @@
       <property name="geometry">
        <rect>
         <x>550</x>
-        <y>150</y>
+        <y>170</y>
         <width>51</width>
         <height>31</height>
        </rect>
       </property>
      </widget>
-     <widget class="QTextEdit" name="desired_velocity_input">
+     <widget class="QTextEdit" name="test_velocity_input">
       <property name="geometry">
        <rect>
         <x>550</x>
-        <y>50</y>
+        <y>70</y>
         <width>101</width>
         <height>31</height>
        </rect>
@@ -90,7 +93,7 @@
       <property name="geometry">
        <rect>
         <x>380</x>
-        <y>10</y>
+        <y>30</y>
         <width>291</width>
         <height>20</height>
        </rect>
@@ -111,23 +114,23 @@
       <property name="geometry">
        <rect>
         <x>380</x>
-        <y>110</y>
+        <y>130</y>
         <width>161</width>
         <height>20</height>
        </rect>
       </property>
       <property name="text">
-       <string>desired acceleration:</string>
+       <string>test acceleration:</string>
       </property>
       <property name="alignment">
        <set>Qt::AlignCenter</set>
       </property>
      </widget>
-     <widget class="QPushButton" name="angle_setting_btn">
+     <widget class="QPushButton" name="const_angle_setting_btn">
       <property name="geometry">
        <rect>
         <x>40</x>
-        <y>350</y>
+        <y>390</y>
         <width>91</width>
         <height>23</height>
        </rect>
@@ -140,7 +143,7 @@
       <property name="geometry">
        <rect>
         <x>420</x>
-        <y>210</y>
+        <y>230</y>
         <width>121</width>
         <height>20</height>
        </rect>
@@ -152,11 +155,11 @@
        <set>Qt::AlignCenter</set>
       </property>
      </widget>
-     <widget class="QTextEdit" name="desired_angle_input">
+     <widget class="QTextEdit" name="const_angle_input">
       <property name="geometry">
        <rect>
         <x>190</x>
-        <y>300</y>
+        <y>320</y>
         <width>101</width>
         <height>31</height>
        </rect>
@@ -166,7 +169,7 @@
       <property name="geometry">
        <rect>
         <x>390</x>
-        <y>350</y>
+        <y>390</y>
         <width>81</width>
         <height>23</height>
        </rect>
@@ -175,32 +178,11 @@
        <string>Setting</string>
       </property>
      </widget>
-     <widget class="QLabel" name="control_mode_label">
-      <property name="geometry">
-       <rect>
-        <x>120</x>
-        <y>80</y>
-        <width>111</width>
-        <height>16</height>
-       </rect>
-      </property>
-      <property name="font">
-       <font>
-        <pointsize>12</pointsize>
-       </font>
-      </property>
-      <property name="text">
-       <string>Control Mode</string>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignCenter</set>
-      </property>
-     </widget>
      <widget class="QTextEdit" name="test_rom_lower_input">
       <property name="geometry">
        <rect>
         <x>550</x>
-        <y>260</y>
+        <y>280</y>
         <width>101</width>
         <height>31</height>
        </rect>
@@ -210,7 +192,7 @@
       <property name="geometry">
        <rect>
         <x>60</x>
-        <y>270</y>
+        <y>290</y>
         <width>241</width>
         <height>20</height>
        </rect>
@@ -221,7 +203,7 @@
        </font>
       </property>
       <property name="text">
-       <string>Desired angle</string>
+       <string>const angle</string>
       </property>
       <property name="alignment">
        <set>Qt::AlignCenter</set>
@@ -231,7 +213,7 @@
       <property name="geometry">
        <rect>
         <x>380</x>
-        <y>160</y>
+        <y>180</y>
         <width>121</width>
         <height>20</height>
        </rect>
@@ -247,36 +229,36 @@
       <property name="geometry">
        <rect>
         <x>410</x>
-        <y>60</y>
+        <y>80</y>
         <width>131</width>
         <height>20</height>
        </rect>
       </property>
       <property name="text">
-       <string>desired velocity:</string>
+       <string>test velocity:</string>
       </property>
       <property name="alignment">
        <set>Qt::AlignCenter</set>
       </property>
      </widget>
-     <widget class="QCheckBox" name="desired_angle_move_check">
+     <widget class="QCheckBox" name="const_angle_move_check">
       <property name="geometry">
        <rect>
-        <x>40</x>
-        <y>170</y>
+        <x>20</x>
+        <y>120</y>
         <width>271</width>
         <height>16</height>
        </rect>
       </property>
       <property name="text">
-       <string>desired angle move</string>
+       <string>const angle move</string>
       </property>
      </widget>
      <widget class="QCheckBox" name="hydrodynamic_constant_acceleration_check">
       <property name="geometry">
        <rect>
-        <x>40</x>
-        <y>140</y>
+        <x>20</x>
+        <y>90</y>
         <width>271</width>
         <height>16</height>
        </rect>
@@ -285,11 +267,11 @@
        <string>hydrodynamic_constant_acceleration</string>
       </property>
      </widget>
-     <widget class="QPushButton" name="angle_start_btn">
+     <widget class="QPushButton" name="const_angle_start_btn">
       <property name="geometry">
        <rect>
         <x>140</x>
-        <y>350</y>
+        <y>390</y>
         <width>91</width>
         <height>23</height>
        </rect>
@@ -298,11 +280,11 @@
        <string>Start</string>
       </property>
      </widget>
-     <widget class="QTextEdit" name="desired_acceleration_input">
+     <widget class="QTextEdit" name="test_acceleration_input">
       <property name="geometry">
        <rect>
         <x>550</x>
-        <y>100</y>
+        <y>120</y>
         <width>101</width>
         <height>31</height>
        </rect>
@@ -312,13 +294,13 @@
       <property name="geometry">
        <rect>
         <x>60</x>
-        <y>310</y>
+        <y>330</y>
         <width>121</width>
         <height>20</height>
        </rect>
       </property>
       <property name="text">
-       <string>Desired angle:</string>
+       <string>const angle:</string>
       </property>
       <property name="alignment">
        <set>Qt::AlignCenter</set>
@@ -327,8 +309,8 @@
      <widget class="QCheckBox" name="hydrodynamic_constant_velocity_check">
       <property name="geometry">
        <rect>
-        <x>40</x>
-        <y>110</y>
+        <x>20</x>
+        <y>60</y>
         <width>241</width>
         <height>16</height>
        </rect>
@@ -349,7 +331,7 @@
       <property name="geometry">
        <rect>
         <x>420</x>
-        <y>260</y>
+        <y>280</y>
         <width>121</width>
         <height>20</height>
        </rect>
@@ -365,17 +347,17 @@
       <property name="geometry">
        <rect>
         <x>550</x>
-        <y>210</y>
+        <y>230</y>
         <width>101</width>
         <height>31</height>
        </rect>
       </property>
      </widget>
-     <widget class="QPushButton" name="angle_stop_btn">
+     <widget class="QPushButton" name="const_angle_stop_btn">
       <property name="geometry">
        <rect>
         <x>240</x>
-        <y>350</y>
+        <y>390</y>
         <width>91</width>
         <height>23</height>
        </rect>
@@ -388,7 +370,7 @@
       <property name="geometry">
        <rect>
         <x>480</x>
-        <y>350</y>
+        <y>390</y>
         <width>91</width>
         <height>23</height>
        </rect>
@@ -401,7 +383,7 @@
       <property name="geometry">
        <rect>
         <x>490</x>
-        <y>150</y>
+        <y>170</y>
         <width>51</width>
         <height>31</height>
        </rect>
@@ -411,7 +393,7 @@
       <property name="geometry">
        <rect>
         <x>550</x>
-        <y>310</y>
+        <y>330</y>
         <width>101</width>
         <height>31</height>
        </rect>
@@ -421,7 +403,7 @@
       <property name="geometry">
        <rect>
         <x>420</x>
-        <y>310</y>
+        <y>330</y>
         <width>121</width>
         <height>20</height>
        </rect>
@@ -433,11 +415,615 @@
        <set>Qt::AlignCenter</set>
       </property>
      </widget>
+     <widget class="QLabel" name="control_mode_label_3">
+      <property name="geometry">
+       <rect>
+        <x>90</x>
+        <y>30</y>
+        <width>141</width>
+        <height>16</height>
+       </rect>
+      </property>
+      <property name="font">
+       <font>
+        <pointsize>14</pointsize>
+       </font>
+      </property>
+      <property name="text">
+       <string>Control Mode</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
     </widget>
-    <widget class="QWidget" name="tab_2">
+    <widget class="QWidget" name="Exercise">
      <attribute name="title">
-      <string>Tab 2</string>
+      <string>Exercise tab</string>
      </attribute>
+     <widget class="QTextEdit" name="resistance_moment_input">
+      <property name="geometry">
+       <rect>
+        <x>500</x>
+        <y>300</y>
+        <width>101</width>
+        <height>31</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QTextEdit" name="assistance_d_input">
+      <property name="geometry">
+       <rect>
+        <x>620</x>
+        <y>190</y>
+        <width>51</width>
+        <height>31</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="exercise_stop_btn">
+      <property name="geometry">
+       <rect>
+        <x>570</x>
+        <y>390</y>
+        <width>91</width>
+        <height>23</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Stop</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="control_mode_label_2">
+      <property name="geometry">
+       <rect>
+        <x>70</x>
+        <y>20</y>
+        <width>141</width>
+        <height>16</height>
+       </rect>
+      </property>
+      <property name="font">
+       <font>
+        <pointsize>14</pointsize>
+       </font>
+      </property>
+      <property name="text">
+       <string>Control Mode</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="exercise_setting_btn">
+      <property name="geometry">
+       <rect>
+        <x>380</x>
+        <y>390</y>
+        <width>81</width>
+        <height>23</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Setting</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_4">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>160</y>
+        <width>301</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="font">
+       <font>
+        <pointsize>14</pointsize>
+       </font>
+      </property>
+      <property name="text">
+       <string>Exercise parameter setup</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+     <widget class="QTextEdit" name="assistance_i_input">
+      <property name="geometry">
+       <rect>
+        <x>560</x>
+        <y>190</y>
+        <width>51</width>
+        <height>31</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QTextEdit" name="exercise_desired_acceleration">
+      <property name="geometry">
+       <rect>
+        <x>190</x>
+        <y>230</y>
+        <width>101</width>
+        <height>31</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QCheckBox" name="exercise_passive_check">
+      <property name="geometry">
+       <rect>
+        <x>30</x>
+        <y>50</y>
+        <width>241</width>
+        <height>16</height>
+       </rect>
+      </property>
+      <property name="font">
+       <font>
+        <italic>false</italic>
+       </font>
+      </property>
+      <property name="text">
+       <string>Passive mode</string>
+      </property>
+      <property name="tristate">
+       <bool>false</bool>
+      </property>
+     </widget>
+     <widget class="QTextEdit" name="assistance_p_input">
+      <property name="geometry">
+       <rect>
+        <x>500</x>
+        <y>190</y>
+        <width>51</width>
+        <height>31</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QCheckBox" name="exercise_assistance_check">
+      <property name="geometry">
+       <rect>
+        <x>30</x>
+        <y>80</y>
+        <width>271</width>
+        <height>16</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Active Assistance mode</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="pos_label_11">
+      <property name="geometry">
+       <rect>
+        <x>50</x>
+        <y>200</y>
+        <width>131</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>desired velocity</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+     <widget class="QTextEdit" name="exercise_desired_velocity">
+      <property name="geometry">
+       <rect>
+        <x>190</x>
+        <y>190</y>
+        <width>101</width>
+        <height>31</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QLabel" name="pos_label_13">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>240</y>
+        <width>161</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>desired acceleration</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+     <widget class="QLabel" name="pos_label_22">
+      <property name="geometry">
+       <rect>
+        <x>350</x>
+        <y>310</y>
+        <width>131</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Resistancemoment</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+      </property>
+     </widget>
+     <widget class="QLabel" name="pos_label_14">
+      <property name="geometry">
+       <rect>
+        <x>360</x>
+        <y>200</y>
+        <width>121</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Assistance PID</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+      </property>
+     </widget>
+     <widget class="QCheckBox" name="exercise_resistance_check">
+      <property name="geometry">
+       <rect>
+        <x>30</x>
+        <y>110</y>
+        <width>271</width>
+        <height>16</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Active Resistance mode</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="exercise_start_btn">
+      <property name="geometry">
+       <rect>
+        <x>470</x>
+        <y>390</y>
+        <width>91</width>
+        <height>23</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Start</string>
+      </property>
+     </widget>
+     <widget class="QTextEdit" name="passive_i_input">
+      <property name="geometry">
+       <rect>
+        <x>560</x>
+        <y>50</y>
+        <width>51</width>
+        <height>31</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QTextEdit" name="passive_d_input">
+      <property name="geometry">
+       <rect>
+        <x>620</x>
+        <y>50</y>
+        <width>51</width>
+        <height>31</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QLabel" name="pos_label_15">
+      <property name="geometry">
+       <rect>
+        <x>400</x>
+        <y>60</y>
+        <width>81</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Passive PID</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+      </property>
+     </widget>
+     <widget class="QTextEdit" name="passive_p_input">
+      <property name="geometry">
+       <rect>
+        <x>500</x>
+        <y>50</y>
+        <width>51</width>
+        <height>31</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QTextEdit" name="exercise_repeatation_number">
+      <property name="geometry">
+       <rect>
+        <x>190</x>
+        <y>270</y>
+        <width>101</width>
+        <height>31</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QLabel" name="pos_label_16">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>280</y>
+        <width>161</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>repeatation number</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+     <widget class="QLabel" name="pos_label_23">
+      <property name="geometry">
+       <rect>
+        <x>360</x>
+        <y>160</y>
+        <width>121</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Assistance Gain K</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+      </property>
+     </widget>
+     <widget class="QTextEdit" name="assistance_gain_k_input">
+      <property name="geometry">
+       <rect>
+        <x>500</x>
+        <y>150</y>
+        <width>51</width>
+        <height>31</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_5">
+      <property name="geometry">
+       <rect>
+        <x>360</x>
+        <y>110</y>
+        <width>301</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="font">
+       <font>
+        <pointsize>12</pointsize>
+       </font>
+      </property>
+      <property name="text">
+       <string>Assistance parameter setup</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_6">
+      <property name="geometry">
+       <rect>
+        <x>370</x>
+        <y>20</y>
+        <width>301</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="font">
+       <font>
+        <pointsize>12</pointsize>
+       </font>
+      </property>
+      <property name="text">
+       <string>Passive parameter setup</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_7">
+      <property name="geometry">
+       <rect>
+        <x>360</x>
+        <y>270</y>
+        <width>301</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="font">
+       <font>
+        <pointsize>12</pointsize>
+       </font>
+      </property>
+      <property name="text">
+       <string>Resistance parameter setup</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+     <widget class="QLabel" name="pos_label_20">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>320</y>
+        <width>161</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>hold time</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+     <widget class="QTextEdit" name="exercise_hold_time">
+      <property name="geometry">
+       <rect>
+        <x>190</x>
+        <y>310</y>
+        <width>101</width>
+        <height>31</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QLabel" name="pos_label_21">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>360</y>
+        <width>161</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>rom upper</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+     <widget class="QTextEdit" name="exercise_rom_upper">
+      <property name="geometry">
+       <rect>
+        <x>190</x>
+        <y>350</y>
+        <width>101</width>
+        <height>31</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QLabel" name="pos_label_24">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>400</y>
+        <width>161</width>
+        <height>21</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>rom lower</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+     <widget class="QTextEdit" name="exercise_rom_lower">
+      <property name="geometry">
+       <rect>
+        <x>190</x>
+        <y>390</y>
+        <width>101</width>
+        <height>31</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QLabel" name="pos_label_25">
+      <property name="geometry">
+       <rect>
+        <x>320</x>
+        <y>240</y>
+        <width>161</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Assistance muscle PID</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+      </property>
+     </widget>
+     <widget class="QLabel" name="pos_label_26">
+      <property name="geometry">
+       <rect>
+        <x>320</x>
+        <y>350</y>
+        <width>161</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Resistance muscle PID</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+      </property>
+     </widget>
+     <widget class="QTextEdit" name="assistance_muscle_i_input">
+      <property name="geometry">
+       <rect>
+        <x>560</x>
+        <y>230</y>
+        <width>51</width>
+        <height>31</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QTextEdit" name="assistance_muscle_p_input">
+      <property name="geometry">
+       <rect>
+        <x>500</x>
+        <y>230</y>
+        <width>51</width>
+        <height>31</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QTextEdit" name="assistance_muscle_d_input">
+      <property name="geometry">
+       <rect>
+        <x>620</x>
+        <y>230</y>
+        <width>51</width>
+        <height>31</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QTextEdit" name="resistance_muscle_d_input">
+      <property name="geometry">
+       <rect>
+        <x>620</x>
+        <y>340</y>
+        <width>51</width>
+        <height>31</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QTextEdit" name="resistance_muscle_i_input">
+      <property name="geometry">
+       <rect>
+        <x>560</x>
+        <y>340</y>
+        <width>51</width>
+        <height>31</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QTextEdit" name="resistance_muscle_p_input">
+      <property name="geometry">
+       <rect>
+        <x>500</x>
+        <y>340</y>
+        <width>51</width>
+        <height>31</height>
+       </rect>
+      </property>
+     </widget>
     </widget>
    </widget>
    <widget class="QPushButton" name="parameter_save_btn">

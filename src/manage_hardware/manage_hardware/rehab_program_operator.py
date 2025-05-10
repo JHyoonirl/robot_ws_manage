@@ -407,10 +407,10 @@ class Rehab(Node):
         self.RMD.raw_motor_run()
 
     
-
+    ###### thruster 자체적으로 계산하도록 할 것, desired trajectory만 넘겨주는 형식 #####
     def setting_thruster(self):
 
-        self.thruster_publisher = self.create_publisher(Float64, 'thruster_signal', self.qos_profile)
+        self.thruster_publisher = self.create_publisher(Float64, 'thruster_signal', self.qos_profile)        
         self.thruster = 50.0  # 초기 thruster 값 설정
         self.torque = 0
         self.thruster_response = True  # 서비스 응답 상태 초기화

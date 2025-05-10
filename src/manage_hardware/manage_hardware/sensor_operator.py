@@ -2,8 +2,9 @@ from multiprocessing import Process, Queue
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
+from rclpy.executors import MultiThreadedExecutor
 # from FT_SENSOR import FTSensor
-from FT_SENSOR_jh import FTSensor
+from custom_module.FT_SENSOR_jh import FTSensor
 import time
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QPushButton, QVBoxLayout, QSpinBox, QLabel
 from PyQt5.QtCore import QTimer
@@ -130,7 +131,7 @@ class Sensor(Node):
             
 
 class SensorApp(QMainWindow):
-    def __init__(self, sensor):
+    def __init__(self, sensor: Sensor):
         QMainWindow.__init__(self)
         self.sensor = sensor
         self.threadhold = 200
@@ -140,63 +141,16 @@ class SensorApp(QMainWindow):
         
         self.force_data = [[], [], []]  # 각 축의 힘 데이터를 저장하는 리스트
         self.torque_data = [[], [], []]  # 각 축의 토크 데이터를 저장하는 리스트
+        self.move(900, 0)
         self.show()
 
     def init_ui(self):
 
-        # plot 위젯 찾기
-        # self.plot_force = self.findChild(PlotWidget, 'plot_force')
-        # self.plot_torque = self.findChild(PlotWidget, 'plot_torque')
-
-        
-        # self.plot_force_x = self.plot_force.plot(pen='r', name='Force_x')
-        # self.plot_force_y = self.plot_force.plot(pen='g', name='Force_y')
-        # self.plot_force_z = self.plot_force.plot(pen='b', name='Force_z')
-        # self.plot_forces = [self.plot_force_x, self.plot_force_y, self.plot_force_z]
-        # self.plot_force.setTitle("Force Readings")
-        # self.plot_force.setBackground("w")
-        # self.plot_force.setYRange(-30, 30)
-        # self.plot_force.addLegend(offset=(10, 30))
-
-        # self.plot_torque_x = self.plot_torque.plot(pen='r', name='Torque_x')
-        # self.plot_torque_y = self.plot_torque.plot(pen='g', name='Torque_y')
-        # self.plot_torque_z = self.plot_torque.plot(pen='b', name='Torque_z')
-        # self.plot_torques = [self.plot_torque_x, self.plot_torque_y, self.plot_torque_z]
-        # self.plot_torque.setTitle("Torque Readings")
-        # self.plot_torque.setYRange(-3, 3)
-        # self.plot_torque.setBackground("w")
-        # self.plot_torque.addLegend(offset=(10, 30))
-
-        # ### 타이머 설정 ###
-        # self.timer = QTimer(self)
-        # self.timer.timeout.connect(self.update_data)
-        # self.timer.start(5)  # 100ms 간격으로 업데이트
-        
         # 버튼 위젯 찾기
         self.btn_bias = self.findChild(QPushButton, 'Setbias')
         self.btn_start = self.findChild(QPushButton, 'Setstart')
         self.btn_stop = self.findChild(QPushButton, 'Setstop')
         self.btn_quit = self.findChild(QPushButton, 'Quit')
-
-        # 라벨 위젯 찾기
-        # self.label_force_x = self.findChild(QLabel, 'ForceX')
-        # self.label_torque_x = self.findChild(QLabel, 'TorqueX')
-        # self.label_force_y = self.findChild(QLabel, 'ForceY')
-        # self.label_torque_y = self.findChild(QLabel, 'TorqueY')
-        # self.label_force_z = self.findChild(QLabel, 'ForceZ')
-        # self.label_torque_z = self.findChild(QLabel, 'TorqueZ')
-
-        # self.force_labels = [
-        #     self.findChild(QLabel, 'force_x_data'),
-        #     self.findChild(QLabel, 'force_y_data'),
-        #     self.findChild(QLabel, 'force_z_data')
-        # ]
-
-        # self.torque_labels = [
-        #     self.findChild(QLabel, 'torque_x_data'),
-        #     self.findChild(QLabel, 'torque_y_data'),
-        #     self.findChild(QLabel, 'torque_z_data')
-        # ]
 
         # # 버튼 클릭 이벤트 연결
         self.btn_bias.clicked.connect(self.set_bias)
@@ -204,32 +158,6 @@ class SensorApp(QMainWindow):
         self.btn_stop.clicked.connect(self.turn_off)
         self.btn_quit.clicked.connect(self.close)
 
-    def update_data(self):
-        force = self.sensor.decoded_force
-        torque = self.sensor.decoded_torque
-        # self.label_force_x_data.setText(f'Force: {force[0]}, {force[1]}, {force[2]}')
-        # self.label_force_y_data.setText(f'Torque: {torque[0]}, {torque[1]}, {torque[2]}')
-
-        for i, label in enumerate(self.force_labels):
-            label.setText(f'{force[i]}')
-        
-        for i, label in enumerate(self.torque_labels):
-            label.setText(f'{torque[i]}')
-
-
-        ### 데이터 저장 및 그래프 업데이트 ###
-        for i in range(3):
-            if len(self.force_data[i]) >= self.threadhold:  # 최대 threadhold개 데이터 유지
-                self.force_data[i].pop(0)
-            if len(self.torque_data[i]) >= self.threadhold:
-                self.torque_data[i].pop(0)
-            self.force_data[i].append(force[i])
-            self.torque_data[i].append(torque[i])
-            self.plot_forces[i].setData(self.force_data[i])
-            self.plot_torques[i].setData(self.torque_data[i])
-
-        # self.plot_force.setData(self.force_data[0])  # 평탄화하여 데이터 설정
-        # self.plot_torque.setData(self.torque_data[0])
 
     def set_bias(self):
         if self.sensor.init_status:
@@ -251,35 +179,45 @@ class SensorApp(QMainWindow):
     
     def close(self):
         sys.exit()
-def run_node(node):
-    rclpy.spin(node)
+
+class Ros2Thread(Thread):
+    def __init__(self, node):
+        super().__init__()
+        self.node = node
+        self.executor = MultiThreadedExecutor()
+
+    def run(self):
+        self.executor.add_node(self.node)
+        try:
+            self.executor.spin()
+        finally:
+            self.executor.shutdown()
+
+    def stop(self):
+        self.executor.remove_node(self.node)
+        self.node.destroy_node()
 
 def main(args=None):
     def signal_handler(sig, frame):
         print("Shutting down...")
-        QApplication.quit()  # QApplication을 종료합니다.
+        app.quit()  # QApplication을 종료합니다.
+        sys.exit(0)  # 강제로 종료합니다.
 
     signal.signal(signal.SIGINT, signal_handler)  # SIGINT 신호를 처리하기 위해 핸들러를 등록합니다.
-    
+
     rclpy.init(args=args)
     sensor = Sensor()
-    thread = Thread(target=run_node, args=(sensor,), daemon=True)
-    # sensor_data_read_thread = Thread(target=sensor.sensor_GUI.data_process, daemon=True)
-    # process_thread = Thread(target=node.process_data, daemon=True)
-    thread.start()
-    time.sleep(0.5)
-    # if sensor.init_status:
-        # sensor_data_read_thread.start()
-        # process_thread.start()
+    ros2_thread = Ros2Thread(sensor)
+    ros2_thread.start()
 
     app = QApplication(sys.argv)
     ex = SensorApp(sensor)
-    
-    sys.exit(app.exec_())
-    
-    sensor.destroy_node()
-    rclpy.shutdown()
-    thread.join()
+
+    try:
+        sys.exit(app.exec_())
+    finally:
+        ros2_thread.stop()
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

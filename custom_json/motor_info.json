@@ -1,7 +1,7 @@
 {
-    "rom_safe_upper": 140.0,
-    "rom_safe_lower": 40.0,
-    "perpendicular_angle": 205.0,
+    "rom_safe_upper": 150.0,
+    "rom_safe_lower": 30.0,
+    "perpendicular_angle": 115.0,
     "desired_velocity_input": 20.0,
     "desired_acceleration_input": 10.0,
     "test_p_input": 1.0,

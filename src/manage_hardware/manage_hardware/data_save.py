@@ -26,7 +26,6 @@ class DataSaver(Node):
 
         self.force_x = self.force_y = self.force_z = 0.0
         self.torque_x = self.torque_y = self.torque_z = 0.0
-        self.voltage = self.torque_current = self.knee_angle =self.velocity = 0.0
         
         # self.prev_pwm = None
         # self.prev_force = (None, None, None)
@@ -54,8 +53,8 @@ class DataSaver(Node):
 
         self.past_time_motor = time.time()
 
-        
-        self.Thruster_publisher = self.create_publisher(Float64, 'thruster_signal', self.qos_profile) # 실험을 위해 주석 처리
+        #### 이제 분석 완료하여 주석 처리, 삭제하지는 말 것 #####
+        # self.Thruster_publisher = self.create_publisher(Float64, 'thruster_signal', self.qos_profile) # 실험을 위해 주석 처리
         
         self.thruster_sub = self.create_subscription(
             Float64,
@@ -81,16 +80,24 @@ class DataSaver(Node):
             self.motor_subscriber,
             self.qos_profile_)
 
+        # Updated motor_info structure
+        self.voltage = 0.0
+        self.torque_current = 0.0
+        self.motor_velocity = 0.0
+        self.motor_knee_angle = 0.0
+
         # Lock for thread safety when accessing node data
         self.data_lock = Lock()
         # self.timer_1 = self.create_timer(0.005, self.data_saver)
         # self.timer_2 = self.create_timer(0.005, self.thruster_pub) # 실험을 위해 주석 처리
 
-    def thruster_pub(self):
-        msg = Float64()
+    
+    ###### 이제 분석 완료하여 주석 처리, 삭제하지는 말 것 #####
+    # def thruster_pub(self):
+    #     msg = Float64()
 
-        msg.data = self.thruster_signal
-        self.Thruster_publisher.publish(msg)
+    #     msg.data = self.thruster_signal
+    #     self.Thruster_publisher.publish(msg)
 
     def thruster_subscriber(self, msg):
         # with self.data_lock:
@@ -130,22 +137,20 @@ class DataSaver(Node):
             # self.last_force_save_time = time.time()
 
     def motor_subscriber(self, msg):
-        # with self.data_lock:
-        self.voltage, self.torque_current, self.knee_angle, self.velocity = msg.data
+        _, _, self.voltage, self.torque_current, self.motor_velocity, _, self.motor_knee_angle = msg.data
         self.motor_timestamp = time.time()
         if self.saving_status and self.motor_status == True:
             dt_object = datetime.datetime.fromtimestamp(self.motor_timestamp)
             formatted_time = dt_object.strftime('%H:%M:%S.%f')[:-3]
-
-            data_entry = [formatted_time, self.voltage, self.torque_current, self.knee_angle, self.velocity]
+            'Time', 'voltage', 'torque_current', 'angle', 'velocity'
+            data_entry = [
+                formatted_time, self.voltage, self.torque_current,
+                self.motor_knee_angle, self.motor_velocity 
+            ]
             self.data_sheet_motor.append(data_entry)
-        # self.get_logger().info('{0}'.format(time.time() - self.past_time_motor))
-        # self.past_time_motor = time.time()
-
-            # self.last_force_save_time = time.time()
 
 class DataSaveApp(QMainWindow):
-    def __init__(self, node):
+    def __init__(self, node: DataSaver):
         super().__init__()
         self.node = node
         self.data = deque()  # Using deque for more efficient append operations
@@ -174,9 +179,9 @@ class DataSaveApp(QMainWindow):
         self.Sensor_data_checkbox = self.findChild(QCheckBox, 'sensor_check')
         self.Motor_data_checkbox = self.findChild(QCheckBox, 'motor_check')
 
-        self.Thruster_data_checkbox.setCheckState(True)
-        self.Sensor_data_checkbox.setCheckState(True)
-        self.Motor_data_checkbox.setCheckState(True)
+        self.Thruster_data_checkbox.setChecked(True)
+        self.Sensor_data_checkbox.setChecked(True)
+        self.Motor_data_checkbox.setChecked(True)
 
         self.Thruster_data_checkbox.stateChanged.connect(self.thruster_checked)
         self.Sensor_data_checkbox.stateChanged.connect(self.sensor_checked)
