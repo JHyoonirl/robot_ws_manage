@@ -9,7 +9,7 @@ from PyQt5.QtCore import QTimer, Qt
 from threading import Thread
 from datetime import datetime
 from PyQt5 import uic
-from thruster_torque_converter import thruster_converter
+from custom_module.thruster_torque_converter import thruster_converter
 import signal
 
 form_class = uic.loadUiType("UI/thruster.ui")[0]

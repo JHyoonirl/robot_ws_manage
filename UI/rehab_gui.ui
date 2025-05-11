@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>748</width>
-    <height>842</height>
+    <height>889</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -31,7 +31,7 @@
     <property name="geometry">
      <rect>
       <x>20</x>
-      <y>310</y>
+      <y>360</y>
       <width>711</width>
       <height>471</height>
      </rect>
@@ -40,7 +40,7 @@
      <enum>QTabWidget::Rounded</enum>
     </property>
     <property name="currentIndex">
-     <number>1</number>
+     <number>0</number>
     </property>
     <widget class="QWidget" name="tab">
      <attribute name="title">
@@ -159,7 +159,7 @@
       <property name="geometry">
        <rect>
         <x>190</x>
-        <y>320</y>
+        <y>330</y>
         <width>101</width>
         <height>31</height>
        </rect>
@@ -464,7 +464,7 @@
      <widget class="QPushButton" name="exercise_stop_btn">
       <property name="geometry">
        <rect>
-        <x>570</x>
+        <x>580</x>
         <y>390</y>
         <width>91</width>
         <height>23</height>
@@ -498,7 +498,7 @@
      <widget class="QPushButton" name="exercise_setting_btn">
       <property name="geometry">
        <rect>
-        <x>380</x>
+        <x>390</x>
         <y>390</y>
         <width>81</width>
         <height>23</height>
@@ -683,7 +683,7 @@
      <widget class="QPushButton" name="exercise_start_btn">
       <property name="geometry">
        <rect>
-        <x>470</x>
+        <x>480</x>
         <y>390</y>
         <width>91</width>
         <height>23</height>
@@ -1161,7 +1161,7 @@
      </rect>
     </property>
     <property name="text">
-     <string>power status:</string>
+     <string>motor status:</string>
     </property>
     <property name="alignment">
      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -1171,7 +1171,7 @@
     <property name="geometry">
      <rect>
       <x>160</x>
-      <y>200</y>
+      <y>270</y>
       <width>121</width>
       <height>31</height>
      </rect>
@@ -1186,26 +1186,6 @@
       <x>160</x>
       <y>50</y>
       <width>121</width>
-      <height>31</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QTextBrowser" name="power_enabled_status">
-    <property name="geometry">
-     <rect>
-      <x>160</x>
-      <y>150</y>
-      <width>51</width>
-      <height>31</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QTextBrowser" name="control_active">
-    <property name="geometry">
-     <rect>
-      <x>230</x>
-      <y>150</y>
-      <width>51</width>
       <height>31</height>
      </rect>
     </property>
@@ -1255,8 +1235,8 @@
    <widget class="QCheckBox" name="control_on_off_check">
     <property name="geometry">
      <rect>
-      <x>40</x>
-      <y>260</y>
+      <x>30</x>
+      <y>330</y>
       <width>201</width>
       <height>16</height>
      </rect>
@@ -1307,6 +1287,98 @@
     </property>
     <property name="text">
      <string>muscle passive component</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="vel_data_label_3">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>200</y>
+      <width>121</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>thruster status:</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+    </property>
+   </widget>
+   <widget class="QTextBrowser" name="motor_power_enabled_status">
+    <property name="geometry">
+     <rect>
+      <x>160</x>
+      <y>150</y>
+      <width>51</width>
+      <height>31</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QTextBrowser" name="thruster_power_enabled_status">
+    <property name="geometry">
+     <rect>
+      <x>160</x>
+      <y>190</y>
+      <width>51</width>
+      <height>31</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QTextBrowser" name="motor_control_active">
+    <property name="geometry">
+     <rect>
+      <x>230</x>
+      <y>150</y>
+      <width>51</width>
+      <height>31</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QTextBrowser" name="thruster_control_active">
+    <property name="geometry">
+     <rect>
+      <x>230</x>
+      <y>190</y>
+      <width>51</width>
+      <height>31</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLabel" name="vel_data_label_4">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>240</y>
+      <width>121</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>GUI status:</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+    </property>
+   </widget>
+   <widget class="QTextBrowser" name="gui_power_enabled_status">
+    <property name="geometry">
+     <rect>
+      <x>160</x>
+      <y>230</y>
+      <width>51</width>
+      <height>31</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QTextBrowser" name="gui_control_active">
+    <property name="geometry">
+     <rect>
+      <x>230</x>
+      <y>230</y>
+      <width>51</width>
+      <height>31</height>
+     </rect>
     </property>
    </widget>
   </widget>

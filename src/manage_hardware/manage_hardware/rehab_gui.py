@@ -13,7 +13,7 @@ import time
 import json
 import signal
 
-
+# from custom_module.ui_module import RehabWindow
 
 class Rehab_program(Node):
     def __init__(self):
@@ -227,6 +227,8 @@ class Rehab_program(Node):
         self.timer = self.create_timer(0.01, self.rehab_control_pub)
 
     def rehab_control_pub(self):
+
+        
         self.exercise_info_pub()
         self.exercise_parameter_pub()
         self.passive_parameter_pub()

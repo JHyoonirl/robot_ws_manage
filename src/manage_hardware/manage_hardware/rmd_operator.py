@@ -80,6 +80,9 @@ class Motor(Node):
         self.motor_resistance_control_subscriber = self.create_subscription(
             Float64MultiArray, 'Motor_resistance_control_info', self.motor_resistance_callback, self.qos_profile
         )
+        self.const_angle_parameter_subscriber = self.create_subscription(
+            Float64MultiArray, 'Const_angle_parameter', self.const_angle_parameter_callback, self.qos_profile
+        )
 
 
         ##############
@@ -129,7 +132,7 @@ class Motor(Node):
         3. passive exercise
         4. resistance exercise
         5. assistance exercise
-        6. position move
+        6. const angle move
         '''
         self.control_active = 0
         # 제어 관련 내부 변수
@@ -168,6 +171,9 @@ class Motor(Node):
 
         # assistance parameter
         self.assistance_gains = PIDGains() # assistance gains
+
+
+        self.const_angle = 90
 
 
         status = self.RMD.motor_initialization()
@@ -416,6 +422,13 @@ class Motor(Node):
             self.resistance_gains.derivative = msg.data[2]
         except Exception as e:
             print(f'Error resistance: {e}')
+
+    def const_angle_parameter_callback(self, msg):
+        try:
+            # self.get_logger().info(f"Received const angle parameter: {msg.data}")
+            self.const_angle = msg.data[0]
+        except Exception as e:
+            print(f'Error const angle: {e}')
 
 def main(args=None):
     rclpy.init(args=args)

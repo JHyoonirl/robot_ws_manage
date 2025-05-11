@@ -3,29 +3,29 @@
         "desired_velocity": 20.0,
         "desired_acceleration": 5.0,
         "repeatation_number": 10,
-        "hold_time": 3.0,
+        "hold_time": 10.0,
         "rom_upper": 120.0,
         "rom_lower": 40.0
     },
     "passive_parameter": {
         "passive_p": 1.0,
-        "passive_i": 0.05,
-        "passive_d": 0.01
+        "passive_i": 0.0,
+        "passive_d": 0.0
     },
     "assistance_parameter": {
-        "assistance_gain_k": 1.5,
-        "assistance_p": 0.3,
-        "assistance_i": 0.02,
-        "assistance_d": 0.005,
-        "assistance_muscle_p": 0.25,
-        "assistance_muscle_i": 0.015,
-        "assistance_muscle_d": 0.004
+        "assistance_gain_k": 1.0,
+        "assistance_p": 1.0,
+        "assistance_i": 1.0,
+        "assistance_d": 0.0,
+        "assistance_muscle_p": 1.0,
+        "assistance_muscle_i": 1.0,
+        "assistance_muscle_d": 0.0
     },
     "resistance_parameter": {
-        "resistance_moment": 0.35,
-        "resistance_muscle_p": 0.3,
-        "resistance_muscle_i": 0.01,
-        "resistance_muscle_d": 0.002
+        "resistance_moment": 1.0,
+        "resistance_muscle_p": 1.0,
+        "resistance_muscle_i": 0.0,
+        "resistance_muscle_d": 0.0
     },
     "motor_setting_parameter": {
         "rom_safe_upper": 130.0,
@@ -35,9 +35,9 @@
     "hydrodynamic_parameter": {
         "test_velocity_input": 15.0,
         "test_acceleration_input": 4.0,
-        "test_p_input": 0.8,
-        "test_i_input": 0.03,
-        "test_d_input": 0.007,
+        "test_p_input": 1.5,
+        "test_i_input": 0.0,
+        "test_d_input": 0.0,
         "test_rom_upper_input": 125.0,
         "test_rom_lower_input": 50.0,
         "test_hold_time_input": 2.0
