@@ -14,6 +14,10 @@ import signal
 
 from custom_module.ui_module import RehabWindow
 
+from custom_module.passive_program import Passive_rehab
+from custom_module.assistance_program import Assistance_rehab
+from custom_module.resistance_program import Resistance_rehab
+
 class Rehab_program(Node):
     def __init__(self):
         
@@ -26,6 +30,8 @@ class Rehab_program(Node):
         4) 
         
         '''
+
+        
 
         ### ROS2 진행을 위한 코드 ###
         super().__init__('RMD_Motor_GUI')
@@ -45,6 +51,15 @@ class Rehab_program(Node):
 
         ## ROS2 topic publisher/subscriber 설정
 
+        self.exercise_desired_trajectory_position_publisher = self.create_publisher(
+            Float64, 'desired_trajectory_position', self.qos_profile)
+        
+        self.exercise_desired_trajectory_velocity_publisher = self.create_publisher(
+            Float64, 'desired_vtrajectory_velocity', self.qos_profile)
+        
+        self.exercise_trjactory_state_publisher = self.create_publisher(
+            Float64, 'trajectory_state', self.qos_profile)
+        
         self.exercise_info_publisher = self.create_publisher(
             Float64MultiArray, 'Exercise_info', self.qos_profile)
         
@@ -87,20 +102,46 @@ class Rehab_program(Node):
             self.motor_info_callback,
             self.qos_profile)
         
+
+        ###########################
+        ## exercise trajectroy ####
+        ###########################
+        self.desired_trajectory_position = 0.0
+        '''
+        deg
+        '''
+        self.desired_trajectory_velocity = 0.0
+        '''
+        deg/s
+        '''
+        self.desired_trajectory_state = 0.0
+        '''
+        0: stop
+        1: start
+        2: hold
+        '''
+        
         ###########################
         ##  exercise information ##
         ###########################
 
-        self.desired_angle = 0.0
+        self.desired_position = 0.0
         '''
-        desired exercise knee angle [deg/s]
+        desired exercise knee position [deg]
         '''
+
+        self.desired_velocity = 0.0
+        '''
+        desired exercise knee velocity [deg/s]
+        '''
+
         self.exercise_state = 0
         '''
         0: stop
         1: start
         2: hold
         '''
+
         self.repeatation_number = exercise_parameter['repeatation_number']
         self.hold_time = exercise_parameter['hold_time']
 
@@ -123,8 +164,8 @@ class Rehab_program(Node):
         1. extension constant velocity
         2. sine
         3. passive exercise
-        4. resistance exercise
-        5. assistance exercise
+        4. assistance exercise
+        5. resistance exercise
         6. angle move
         '''
         
@@ -171,15 +212,11 @@ class Rehab_program(Node):
         ##### 실험 진행을 위해서 계속 기억해야 하는 것을 dict로 저장 #####
 
         ### 아래 dict는 publish 할 때 필요한 정보 ###
-        self.exercise_info_dict = {'desired_angle': self.desired_angle,
-                                      'exercise_state': self.exercise_state,
-                                        'repeatation_number': exercise_parameter['repeatation_number'],
-                                        'hold_time': exercise_parameter['hold_time'],
-                                        'power_enabled': self.power_enabled,
-                                        'control_active': self.control_active,
-                                        'control_mode': self.control_mode,
-                                        'muscle_passive_component_switch': self.muscle_passive_component_switch,
-                                        }
+        self.exercise_info_dict = {'power_enabled': self.power_enabled,
+                                    'control_active': self.control_active,
+                                    'control_mode': self.control_mode,
+                                    'muscle_passive_component_switch': self.muscle_passive_component_switch,
+                                    }
         
         self.exercise_para_dict = {'desired_velocity': exercise_parameter['desired_velocity'],
                                    'desired_acceleration': exercise_parameter['desired_acceleration'],
@@ -229,10 +266,35 @@ class Rehab_program(Node):
                                 "const_angle_d": const_angle_parameter['const_angle_d']
                                  }
 
+
+        # Rehab program module inintialization
+
+        self.Passive_rehab_module = Passive_rehab(self)
+        self.Assistance_rehab_module = Assistance_rehab(self)
+        self.Resistance_rehab_module = Resistance_rehab(self)
+        self.past_time = time.time()
+
+
         self.timer = self.create_timer(0.01, self.rehab_control_pub)
+        self.timer_controller = self.create_timer(0.01, self.rehab_program_loop)
+
+    def rehab_program_loop(self):
+        self.control_mode = self.exercise_info_dict['control_mode']
+        if self.control_mode == 3: # passive mode
+            pass
+        elif self.control_mode == 4: # assistance mode
+            pass
+        elif self.control_mode == 5: # assistance mode
+            pass
+        else:
+            pass
+        self.past_time = time.time()
+
 
     def rehab_control_pub(self):
-        
+        self.desired_trajectory_position_pub()
+        self.desired_trajectory_velocity_pub()
+        self.exercise_trajectory_state_publisher()
         self.exercise_info_pub()
         self.exercise_parameter_pub()
         self.passive_parameter_pub()
@@ -242,13 +304,24 @@ class Rehab_program(Node):
         self.motor_setting_parameter_pub()
         self.motor_hydrodynamic_pub()
 
+    def desired_trajectory_position_pub(self):
+        msg = Float64()
+        msg.data = float(self.desired_trajectory_position)
+        self.exercise_desired_trajectory_position_publisher.publish(msg)
+
+    def desired_trajectory_velocity_pub(self):
+        msg = Float64()
+        msg.data = float(self.desired_trajectory_velocity)
+        self.exercise_desired_trajectory_velocity_publisher.publish(msg)
+
+    def exercise_trajectory_state_publisher(self):
+        msg = Float64()
+        msg.data = float(self.exercise_state)
+        self.exercise_trjactory_state_publisher.publish(msg)
+
     def exercise_info_pub(self):
         msg = Float64MultiArray()
-        msg.data = [self.exercise_info_dict['desired_angle'],
-                    self.exercise_info_dict['exercise_state'],
-                    self.exercise_info_dict['repeatation_number'],
-                    self.exercise_info_dict['hold_time'],
-                    self.exercise_info_dict['power_enabled'],
+        msg.data = [self.exercise_info_dict['power_enabled'],
                     self.exercise_info_dict['control_active'],
                     self.exercise_info_dict['control_mode'],
                     self.exercise_info_dict['muscle_passive_component_switch']]
@@ -322,7 +395,7 @@ class Rehab_program(Node):
 
     ###### subscriber callback ######
     def imu_knee_angle_callback(self, msg):
-        self.knee_angle = msg.data
+        self.imu_knee_angle = msg.data
         # print(f"IMU Knee Angle: {self.knee_angle:.2f}")
     def thruster_info_callback(self, msg):
         pass

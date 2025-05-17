@@ -6,6 +6,10 @@ from std_msgs.msg import String, Float64
 from geometry_msgs.msg import Vector3
 import serial
 import time
+import math
+from scipy.signal import savgol_filter
+import numpy as np
+import re
 
 
 # sudo dmesg | grep tty :: usb 포트를 확인하는 코드
@@ -28,7 +32,7 @@ class ESP32Board(Node):
             parity=serial.PARITY_NONE,
             stopbits=serial.STOPBITS_ONE,
             bytesize=serial.EIGHTBITS,
-            timeout=0)
+            timeout=0.1)
         self.ser = ser
         self.status = False
         self.currnet_time = time.time()
@@ -40,8 +44,17 @@ class ESP32Board(Node):
         self.smoothed_acceleration = 0.0
         self.previous_time = 0.0
 
+        # Savitzky-Golay filter parameters
+        self.filter_window = 5  # Window size for Savitzky-Golay filter (must be odd)
+        self.poly_order = 2     # Polynomial order for Savitzky-Golay filter
 
-        self.i2c_write = self.create_publisher(
+        # Buffers for Savitzky-Golay filter
+        self.angle_buffer = []
+        self.velocity_buffer = []
+        self.acceleration_buffer = []
+
+
+        self.imu_shank = self.create_publisher(
             Vector3,
             'imu_data_shank',
             qos_profile)
@@ -56,89 +69,97 @@ class ESP32Board(Node):
             'imu_data_acceleration',
             qos_profile)
         
-        self.imu_data_list = [0, 0, 0, 0] # imu number / roll / pitch / yaw
+        # self.imu_data_list = [] # imu number / roll / pitch / yaw
         
         self.esp_serial()
         if self.status:
-            self.create_timer(0.001, self.publish_Imu)
+            self.create_timer(0.0125, self.publish_imu_data)
             # self.create_timer(0.005, self.publish_etc_data)
 
 
     #  --------------   Publisher def 정의 -------------
 
-    def publish_Imu(self):
-        imu_data = Vector3()
-        EncodeData = ""
-        EncodedData_indexes = []
-        raw_data = []
-        # raw_data_index = []
-        data_list = []
-        EncodeData = self.ser.readline().decode()[0:-1]
-        find_index_list = ["i", "r", "p", "y"]    
+    def publish_imu_data(self):
+        self.ser.write(b'get\n')
+        line = self.ser.readline().decode(errors='ignore').strip()
 
-        for i, find_index in enumerate(find_index_list): # index number(start with 0) / string to find out( ex: imu)
-            EncodedData_indexes.append(EncodeData.find(find_index))
+        if not line:
+            return
 
-        for i, EncodedData_index in enumerate(EncodedData_indexes): # EncodData_index = [0, 4, 8, 10]
-            if i == 3:
-                raw_data = EncodeData[EncodedData_index:-1]
-            else:
-                raw_data = EncodeData[EncodedData_index:EncodedData_indexes[i+1]]
-            raw_data_index = raw_data.find(":")
-            data_list.append(raw_data[raw_data_index+1:])
-        for i, data in enumerate(data_list):
-            # status = False
-            try:
-                data = float(data)
-                self.imu_data_list[i] = data
-                # status = True
-            except:
-                pass
+        data = self.parse_imu_data(line)
+        if not data or not all(k in data for k in ('r', 'p', 'y')):
+            self.get_logger().warn(f"Invalid data: {line}")
+            return
 
-        for i, data in enumerate(self.imu_data_list):
-            if i == 1:
-                imu_data.x = round(float(data) / 16, 3)
-            elif i == 2:
-                imu_data.y = round(float(data) / 16, 3)
-            elif i == 3:
-                imu_data.z = round(float(data) / 16, 3)
-                self.current_angle = round(float(-imu_data.x) + 90, 3)
+        imu_msg = Vector3()
+        '''
+        deg
+        '''
+        imu_msg.x = (-data['r'] + 90) / 16.00
+        self.get_logger().info(f"IMU data: {imu_msg.x}")
+        imu_msg.y = data['p'] / 16.00
+        imu_msg.z = data['y'] / 16.00
 
-        
-        
+        # Apply smoothing to imu_msg using a low-pass filter
+        alpha = 0.5  # Low-pass filter coefficient (adjustable for smoothing level)
 
-        velocity = Float64()
-        acceleration = Float64()
-        self.currnet_time = time.time()
+        if not hasattr(self, 'smoothed_imu_msg'):
+            self.smoothed_imu_msg = Vector3()
 
-        time_delta = 0.005
-        alpha = 0.3  # Smoothing factor
+        # Smooth each component of imu_msg
+        self.smoothed_imu_msg.x = alpha * imu_msg.x + (1 - alpha) * self.smoothed_imu_msg.x
+        self.smoothed_imu_msg.y = alpha * imu_msg.y + (1 - alpha) * self.smoothed_imu_msg.y
+        self.smoothed_imu_msg.z = alpha * imu_msg.z + (1 - alpha) * self.smoothed_imu_msg.z
 
-        if time_delta > 0:
-            # 속도 계산
-            raw_velocity = (self.current_angle - self.previous_angle) / time_delta
-            # Smoothing velocity
-            self.smoothed_velocity = alpha * raw_velocity + (1 - alpha) * self.smoothed_velocity
-            velocity.data = self.smoothed_velocity
+        # Publish the smoothed imu_msg
+        self.imu_shank.publish(self.smoothed_imu_msg)
 
-            # 가속도 계산
-            raw_acceleration = (self.smoothed_velocity - self.previous_velocity) / time_delta
-            # Smoothing acceleration
-            self.smoothed_acceleration = alpha * raw_acceleration + (1 - alpha) * self.smoothed_acceleration
-            acceleration.data = self.smoothed_acceleration
+        self.current_angle = imu_msg.x
+        now = time.time()
+        dt = now - self.previous_time
 
-            self.i2c_write.publish(imu_data)
+        vel_msg = Float64()
+        '''
+        deg/s
+        '''
+        acc_msg = Float64()
+        '''
+        deg/s^2
+        '''
 
-        # 현재 각도와 시간, 속도를 이전 값으로 저장
+        if dt > 0:
+            velocity = (self.current_angle - self.previous_angle) / dt
+            acceleration = (velocity - self.previous_velocity) / dt
+
+            vel_msg.data = velocity * 1000000  # 단위 스케일 조정
+            self.smoothed_acceleration = 0.8 * self.smoothed_acceleration + 0.2 * acceleration
+            acc_msg.data = self.smoothed_acceleration
+
+            self.imu_velocity.publish(vel_msg)
+            self.imu_acceleration.publish(acc_msg)
+
+        self.imu_shank.publish(imu_msg)
+
         self.previous_angle = self.current_angle
-        self.previous_velocity = self.smoothed_velocity
-        self.previous_time = self.currnet_time
+        self.previous_velocity = velocity
+        self.previous_time = now
+
+            
         
 
         
         
     # -------------  공통 사용 함수 정의 -----------
-        
+    
+    def parse_imu_data(self,line: str):
+        try:
+            # ex) "i:1,r:123,p:456,y:789" -> {'i': 1, 'r': 123, 'p': 456, 'y': 789}
+            pattern = r'([a-z]):([-+]?[0-9]*\.?[0-9]+)'
+            matches = re.findall(pattern, line)
+            return {key: float(val) for key, val in matches}
+        except Exception as e:
+            return None
+    
     def esp_serial(self):
         if self.ser.readable():
             self.status = True

@@ -67,6 +67,15 @@ class Motor(Node):
         self.motor_info_publisher = self.create_publisher(Float64MultiArray, 'Motor_info', self.qos_profile)
 
         # Subscribers
+        self.exercise_desired_trajectory_position_subscriber = self.create_subscription(
+            Float64, 'desired_trajectory_position', self.desired_trajectory_position_callback, self.qos_profile
+        )
+        self.exercise_desired_trajectory_velocity_subscriber = self.create_subscription(
+            Float64, 'desired_vtrajectory_velocity', self.desired_trajectory_velocity_callback, self.qos_profile
+        )
+        self.exercise_trajectory_state_subscriber = self.create_subscription(
+            Float64, 'trajectory_state', self.trajectory_state_callback, self.qos_profile)
+
         self.exercise_info_subscriber = self.create_subscription(
             Float64MultiArray, 'Exercise_info', self.exercise_info_callback, self.qos_profile
         )
@@ -86,6 +95,19 @@ class Motor(Node):
             Float64MultiArray, 'Const_angle_parameter', self.const_angle_parameter_callback, self.qos_profile
         )
 
+
+        ##############
+        # exercise trajectory
+        ##############
+        self.desired_trajectory_position = 0.0
+        '''
+        deg
+        '''
+
+        self.desired_trajectory_velocity = 0.0
+        '''
+        deg/s
+        '''
 
         ##############
         # motor information
@@ -453,16 +475,21 @@ class Motor(Node):
         
     
     ############### motor ROS2 callback function ###############
+    def desired_trajectory_position_callback(self, msg:Float64):
+        self.desired_trajectory_position = msg.data
+
+    def desired_trajectory_velocity_callback(self, msg:Float64):
+        self.desired_trajectory_velocity = msg.data
+
+    def trajectory_state_callback(self, msg:Float64):
+        self.exercise_state = msg.data
+
     def exercise_info_callback(self, msg):
         exercise_info = msg.data
-        self.desired_angle = exercise_info[0] # 운동 각도 [deg/s]
-        self.exercise_state = int(exercise_info[1]) # 운동 상태 [0: stop, 1: start, 2: hold]
-        self.repeatation_number = int(exercise_info[2]) # 반복 횟수
-        self.hold_time = exercise_info[3] # 운동 유지 시간 [s]
-        raw_power_enabled = int(exercise_info[4]) # 전원 상태 [0: off, 1: on]
-        control_active = int(exercise_info[5]) # 제어 활성화 상태 [0: off, 1: on]
-        control_mode = int(exercise_info[6]) # 제어 모드 [0: off, 1: extension constant velocity, 2: extension constant acc, 3: passive exercise, 4: resistance exercise, 5: assistance exercise, 6: position move]
-        muscle_passive_component_switch = int(exercise_info[7]) # 모터에 무릎의 passive component 추가 [0: muscle off, 1: muscle on]
+        raw_power_enabled = int(exercise_info[0]) # 전원 상태 [0: off, 1: on]
+        control_active = int(exercise_info[1]) # 제어 활성화 상태 [0: off, 1: on]
+        control_mode = int(exercise_info[2]) # 제어 모드 [0: off, 1: extension constant velocity, 2: extension constant acc, 3: passive exercise, 4: resistance exercise, 5: assistance exercise, 6: position move]
+        muscle_passive_component_switch = int(exercise_info[3]) # 모터에 무릎의 passive component 추가 [0: muscle off, 1: muscle on]
 
         if raw_power_enabled == 1 and self.raw_power_enabled_prev == 0:
             if self.power_locked:

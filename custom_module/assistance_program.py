@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     from src.manage_hardware.manage_hardware.rehab_operator import Rehab_program
 
 
-class Passive_rehab:
+class Assistance_rehab:
     def __init__(self, rehab:Rehab_program):
         
         self.rehab = rehab
@@ -185,9 +185,8 @@ class Passive_rehab:
             des_dis = distance
         self.desired_angle = self.desired_position_start + sign * des_dis
         
-    
 def main():
-    passive_mode = Passive_rehab()
+    assistance_mode = Assistance_rehab()
     # th_converter.visualize_torque_to_rpm()
 
 if __name__ == '__main__':
