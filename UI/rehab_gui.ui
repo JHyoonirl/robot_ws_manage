@@ -120,7 +120,7 @@
        </rect>
       </property>
       <property name="text">
-       <string>test acceleration:</string>
+       <string>test omega:</string>
       </property>
       <property name="alignment">
        <set>Qt::AlignCenter</set>
@@ -159,7 +159,7 @@
       <property name="geometry">
        <rect>
         <x>190</x>
-        <y>330</y>
+        <y>290</y>
         <width>101</width>
         <height>31</height>
        </rect>
@@ -192,7 +192,7 @@
       <property name="geometry">
        <rect>
         <x>60</x>
-        <y>290</y>
+        <y>250</y>
         <width>241</width>
         <height>20</height>
        </rect>
@@ -254,7 +254,7 @@
        <string>const angle move</string>
       </property>
      </widget>
-     <widget class="QCheckBox" name="hydrodynamic_constant_acceleration_check">
+     <widget class="QCheckBox" name="hydrodynamic_omega_check">
       <property name="geometry">
        <rect>
         <x>20</x>
@@ -264,7 +264,7 @@
        </rect>
       </property>
       <property name="text">
-       <string>hydrodynamic_constant_acceleration</string>
+       <string>hydrodynamic omega</string>
       </property>
      </widget>
      <widget class="QPushButton" name="const_angle_start_btn">
@@ -280,7 +280,7 @@
        <string>Start</string>
       </property>
      </widget>
-     <widget class="QTextEdit" name="test_acceleration_input">
+     <widget class="QTextEdit" name="test_omega_input">
       <property name="geometry">
        <rect>
         <x>550</x>
@@ -294,7 +294,7 @@
       <property name="geometry">
        <rect>
         <x>60</x>
-        <y>330</y>
+        <y>290</y>
         <width>121</width>
         <height>20</height>
        </rect>
@@ -434,6 +434,52 @@
       </property>
       <property name="alignment">
        <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+     <widget class="QLabel" name="pos_label_27">
+      <property name="geometry">
+       <rect>
+        <x>70</x>
+        <y>340</y>
+        <width>51</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>pid</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+     <widget class="QTextEdit" name="const_angle_i_input">
+      <property name="geometry">
+       <rect>
+        <x>210</x>
+        <y>340</y>
+        <width>51</width>
+        <height>31</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QTextEdit" name="const_angle_p_input">
+      <property name="geometry">
+       <rect>
+        <x>150</x>
+        <y>340</y>
+        <width>51</width>
+        <height>31</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QTextEdit" name="const_angle_d_input">
+      <property name="geometry">
+       <rect>
+        <x>270</x>
+        <y>340</y>
+        <width>51</width>
+        <height>31</height>
+       </rect>
       </property>
      </widget>
     </widget>

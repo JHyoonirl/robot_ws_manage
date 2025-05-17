@@ -58,9 +58,9 @@ class RehabWindow(QMainWindow):
                 'handler': self.hydrodynamic_constant_velocity_checked,
                 'status': False
             },
-            'hydrodynamic_constant_acceleration_check': {
-                'widget': self.findChild(QCheckBox, 'hydrodynamic_constant_acceleration_check'),
-                'handler': self.hydrodynamic_constant_acceleration_checked,
+            'hydrodynamic_omega_check': {
+                'widget': self.findChild(QCheckBox, 'hydrodynamic_omega_check'),
+                'handler': self.hydrodynamic_omega_checked,
                 'status': False
             },
             'const_angle_move_check': {
@@ -154,7 +154,7 @@ class RehabWindow(QMainWindow):
             },
             'hydro': {
                 'test_velocity_input': None,
-                'test_acceleration_input': None,
+                'test_omega_input': None,
                 'test_p_input': None,
                 'test_i_input': None,
                 'test_d_input': None,
@@ -164,6 +164,9 @@ class RehabWindow(QMainWindow):
             },
             'const_angle': {
                 'const_angle_input': None,
+                'const_angle_p_input': None,
+                'const_angle_i_input': None,
+                'const_angle_d_input': None,
             },
             'exercise': {
                 'exercise_desired_velocity': None,
@@ -212,7 +215,7 @@ class RehabWindow(QMainWindow):
         self.textedit_groups['motor_setting']['perpendicular_angle'].setPlainText(str(self.rehab.motor_setting_dict['perpendicular_angle']))
 
         self.textedit_groups['hydro']['test_velocity_input'].setPlainText(str(self.rehab.hydro_dict['test_velocity_input']))
-        self.textedit_groups['hydro']['test_acceleration_input'].setPlainText(str(self.rehab.hydro_dict['test_acceleration_input']))
+        self.textedit_groups['hydro']['test_omega_input'].setPlainText(str(self.rehab.hydro_dict['test_omega_input']))
         self.textedit_groups['hydro']['test_p_input'].setPlainText(str(self.rehab.hydro_dict['test_p_input']))
         self.textedit_groups['hydro']['test_i_input'].setPlainText(str(self.rehab.hydro_dict['test_i_input']))
         self.textedit_groups['hydro']['test_d_input'].setPlainText(str(self.rehab.hydro_dict['test_d_input']))
@@ -243,6 +246,10 @@ class RehabWindow(QMainWindow):
         self.textedit_groups['resistance']['resistance_muscle_p_input'].setPlainText(str(self.rehab.resistance_para_dict['resistance_muscle_p']))
         self.textedit_groups['resistance']['resistance_muscle_i_input'].setPlainText(str(self.rehab.resistance_para_dict['resistance_muscle_i']))
         self.textedit_groups['resistance']['resistance_muscle_d_input'].setPlainText(str(self.rehab.resistance_para_dict['resistance_muscle_d']))
+
+        self.textedit_groups['const_angle']['const_angle_p_input'].setPlainText(str(self.rehab.const_angle_para_dict['const_angle_p']))
+        self.textedit_groups['const_angle']['const_angle_i_input'].setPlainText(str(self.rehab.const_angle_para_dict['const_angle_i']))
+        self.textedit_groups['const_angle']['const_angle_d_input'].setPlainText(str(self.rehab.const_angle_para_dict['const_angle_d']))
 
     def control_on_off_changed(self, state):
         if state == Qt.Checked:
@@ -282,9 +289,10 @@ class RehabWindow(QMainWindow):
             for name, info in self.checkboxes.items():
                 if name == 'hydrodynamic_constant_velocity_check':
                     info['status'] = False
+            self.rehab.exercise_info_dict['control_mode'] = 0
             self.disable_btn_group('hydro')
     
-    def hydrodynamic_constant_acceleration_checked(self, state):
+    def hydrodynamic_omega_checked(self, state):
         if state == Qt.Checked:
             
             self.enable_btn_group('hydro')
@@ -292,7 +300,7 @@ class RehabWindow(QMainWindow):
             self.rehab.exercise_info_dict['control_mode'] = 2
 
             for name, info in self.checkboxes.items():                
-                if name == 'hydrodynamic_constant_acceleration_check':
+                if name == 'hydrodynamic_omega_check':
                     info['status'] = True
                 else:
                     if info['widget'].checkState() == 2:
@@ -301,8 +309,9 @@ class RehabWindow(QMainWindow):
                 
         else:
             for name, info in self.checkboxes.items():
-                if name == 'hydrodynamic_constant_acceleration_check':
+                if name == 'hydrodynamic_omega_check':
                     info['status'] = False
+            self.rehab.exercise_info_dict['control_mode'] = 0
             self.disable_btn_group('hydro')
 
     def const_angle_move_checked(self, state):
@@ -324,6 +333,7 @@ class RehabWindow(QMainWindow):
             for name, info in self.checkboxes.items():
                 if name == 'const_angle_move_check':
                     info['status'] = False
+            self.rehab.exercise_info_dict['control_mode'] = 0
             self.disable_btn_group('const_angle')
 
     def exercise_passive_checked(self, state):
@@ -345,6 +355,7 @@ class RehabWindow(QMainWindow):
             for name, info in self.checkboxes.items():
                 if name == 'exercise_passive_check':
                     info['status'] = False
+            self.rehab.exercise_info_dict['control_mode'] = 0
             self.disable_btn_group('exercise')
 
     def exercise_assistance_checked(self, state):
@@ -366,6 +377,7 @@ class RehabWindow(QMainWindow):
             for name, info in self.checkboxes.items():
                 if name == 'exercise_assistance_check':
                     info['status'] = False
+            self.rehab.exercise_info_dict['control_mode'] = 0
             self.disable_btn_group('exercise')
     
     def exercise_resistance_checked(self, state):
@@ -387,6 +399,7 @@ class RehabWindow(QMainWindow):
             for name, info in self.checkboxes.items():
                 if name == 'exercise_resistance_check':
                     info['status'] = False
+            self.rehab.exercise_info_dict['control_mode'] = 0
             self.disable_btn_group('exercise')
 
     def muscle_passive_component_checked(self, state):
@@ -465,13 +478,18 @@ class RehabWindow(QMainWindow):
                 },
                 'hydrodynamic_parameter': {
                     'test_velocity_input': self.rehab.hydro_dict['test_velocity_input'],
-                    'test_acceleration_input': self.rehab.hydro_dict['test_acceleration_input'],
+                    'test_omega_input': self.rehab.hydro_dict['test_omega_input'],
                     'test_p_input': self.rehab.hydro_dict['test_p_input'],
                     'test_i_input': self.rehab.hydro_dict['test_i_input'],
                     'test_d_input': self.rehab.hydro_dict['test_d_input'],
                     'test_rom_upper_input': self.rehab.hydro_dict['test_rom_upper_input'],
                     'test_rom_lower_input': self.rehab.hydro_dict['test_rom_lower_input'],
                     'test_hold_time_input': self.rehab.hydro_dict['test_hold_time_input'],
+                },
+                'const_angle_parameter': {
+                    'const_angle_p': self.rehab.const_angle_para_dict['const_angle_p'],
+                    'const_angle_i': self.rehab.const_angle_para_dict['const_angle_i'],
+                    'const_angle_d': self.rehab.const_angle_para_dict['const_angle_d'],
                 }
             }
 
@@ -484,7 +502,7 @@ class RehabWindow(QMainWindow):
         hydro_dict = self.textedit_groups['hydro']
         try:
             self.rehab.hydro_dict['test_velocity_input'] = float(hydro_dict['test_velocity_input'].toPlainText())
-            self.rehab.hydro_dict['test_acceleration_input'] = float(hydro_dict['test_acceleration_input'].toPlainText())
+            self.rehab.hydro_dict['test_omega_input'] = float(hydro_dict['test_omega_input'].toPlainText())
             self.rehab.hydro_dict['test_p_input'] = float(hydro_dict['test_p_input'].toPlainText())
             self.rehab.hydro_dict['test_i_input'] = float(hydro_dict['test_i_input'].toPlainText())
             self.rehab.hydro_dict['test_d_input'] = float(hydro_dict['test_d_input'].toPlainText())
@@ -495,212 +513,29 @@ class RehabWindow(QMainWindow):
             print(f"[RMD 설정 실패] {e}")   
 
     def hydrodynamic_test_start_btn_clicked(self):
-        if self.checkboxes['hydrodynamic_constant_velocity_check']['status'] == True or self.checkboxes['hydrodynamic_constant_acceleration_check']['status'] == True:
-            self.rehab.exercise_info_dict['control_actiave'] = 1
-
-    def hydrodynamic_test_stop_btn_clicked(self):
-        if self.checkboxes['hydrodynamic_constant_velocity_check']['status'] == True or self.checkboxes['hydrodynamic_constant_acceleration_check']['status'] == True:
-            self.rehab.exercise_info_dict['control_actiave'] = 0
-
-    def const_angle_setting_btn_clicked(self):
-        angle_dict = self.textedit_groups['const_angle']
-        try:
-            self.rehab.const_angle_dict['const_angle'] = float(angle_dict['const_angle_input'].toPlainText())
-        except Exception as e:
-            print(f"[RMD angle 설정 실패] {e}")
-
-    def const_angle_start_btn_clicked(self):
-        if self.checkboxes['desired_angle_move_check']['status'] == True:
-            self.rehab.exercise_info_dict['control_actiave'] = 1
-
-    def const_angle_stop_btn_clicked(self):
-        if self.checkboxes['desired_angle_move_check']['status'] == True:
-            self.rehab.exercise_info_dict['control_actiave'] = 0
-
-    def exercise_setting_btn_clicked(self):
-        exercise_dict = self.textedit_groups['exercise']
-        passive_dict = self.textedit_groups['passive']
-        assistance_dict = self.textedit_groups['assistance']
-        resistance_dict = self.textedit_groups['resistance']
-
-        try:
-            self.rehab.exercise_para_dict['desired_velocity'] = float(exercise_dict['exercise_desired_velocity'].toPlainText())
-            self.rehab.exercise_para_dict['desired_acceleration'] = float(exercise_dict['exercise_desired_acceleration'].toPlainText())
-            self.rehab.exercise_para_dict['repeatation_number'] = int(exercise_dict['exercise_repeatation_number'].toPlainText())
-            self.rehab.exercise_para_dict['hold_time'] = float(exercise_dict['exercise_hold_time'].toPlainText())
-            self.rehab.exercise_para_dict['rom_upper'] = float(exercise_dict['exercise_rom_upper'].toPlainText())
-            self.rehab.exercise_para_dict['rom_lower'] = float(exercise_dict['exercise_rom_lower'].toPlainText())
-
-            self.rehab.passive_para_dict['passive_p'] = float(passive_dict['passive_p_input'].toPlainText())
-            self.rehab.passive_para_dict['passive_i'] = float(passive_dict['passive_i_input'].toPlainText())
-            self.rehab.passive_para_dict['passive_d'] = float(passive_dict['passive_d_input'].toPlainText())
-
-            self.rehab.assistance_para_dict['assistance_gain_k'] = float(assistance_dict['assistance_gain_k_input'].toPlainText())
-            self.rehab.assistance_para_dict['assistance_p'] = float(assistance_dict['assistance_p_input'].toPlainText())
-            self.rehab.assistance_para_dict['assistance_i'] = float(assistance_dict['assistance_i_input'].toPlainText())
-            self.rehab.assistance_para_dict['assistance_d'] = float(assistance_dict['assistance_d_input'].toPlainText())
-            self.rehab.assistance_para_dict['assistance_muscle_p'] = float(assistance_dict['assistance_muscle_p_input'].toPlainText())
-            self.rehab.assistance_para_dict['assistance_muscle_i'] = float(assistance_dict['assistance_muscle_i_input'].toPlainText())
-            self.rehab.assistance_para_dict['assistance_muscle_d'] = float(assistance_dict['assistance_muscle_d_input'].toPlainText())
-
-            self.rehab.resistance_para_dict['resistance_moment'] = float(resistance_dict['resistance_moment_input'].toPlainText())
-            self.rehab.resistance_para_dict['resistance_muscle_p'] = float(resistance_dict['resistance_muscle_p_input'].toPlainText())
-            self.rehab.resistance_para_dict['resistance_muscle_i'] = float(resistance_dict['resistance_muscle_i_input'].toPlainText())
-            self.rehab.resistance_para_dict['resistance_muscle_d'] = float(resistance_dict['resistance_muscle_d_input'].toPlainText())
-
-        except Exception as e:
-            print(f"[RMD exercise 설정 실패] {e}")
-
-    def exercise_start_btn_clicked(self):
-        if self.checkboxes['exercise_passive_check']['status'] == True or self.checkboxes['exercise_assistance_check']['status'] == True or self.checkboxes['exercise_resistance_check']['status'] == True:
-            self.rehab.exercise_info_dict['control_actiave'] = 1
-
-    def exercise_stop_btn_clicked(self):
-        if self.checkboxes['exercise_passive_check']['status'] == True or self.checkboxes['exercise_assistance_check']['status'] == True or self.checkboxes['exercise_resistance_check']['status'] == True:
-            self.rehab.exercise_info_dict['control_actiave'] = 0
-
-    def muscle_start_btn_clicked(self):
-        if self.checkboxes['muscle_passive_component_check']['status'] == True:
-            self.rehab.exercise_info_dict['control_actiave'] = 1
-    
-    def muscle_stop_btn_clicked(self):
-        if self.checkboxes['muscle_passive_component_check']['status'] == True:
-            self.rehab.exercise_info_dict['control_actiave'] = 0
-
-    def enable_btn_group(self, group_name):
-        if group_name in self.button_groups:
-            for btn_name in self.button_groups[group_name]:
-                self.button_widgets[btn_name].setEnabled(True)
-
-    def disable_btn_group(self, group_name):
-        if group_name in self.button_groups:
-            for btn_name in self.button_groups[group_name]:
-                self.button_widgets[btn_name].setDisabled(True)
-
-    def btn_on(self):
-        self.enable_btn_group('hydro')
-        self.enable_btn_group('const_angle')
-        self.enable_btn_group('exercise')
-        self.enable_btn_group('muscle')
-    
-    def btn_off(self):
-        self.disable_btn_group('hydro')
-        self.disable_btn_group('const_angle')
-        self.disable_btn_group('exercise')
-        self.disable_btn_group('muscle')
-
-
-    def system_quit_btn_clicked(self):
-        self.rehab.exercise_info_dict['power_enabled'] = 0
-        time.sleep(0.5)
-        sys.exit()
-             
-    def power_on_off_btn_clicked(self):
-        if self.rehab.exercise_info_dict['power_enabled'] == 1:
-            self.rehab.exercise_info_dict['power_enabled'] = 0
-        else:
-            self.rehab.exercise_info_dict['power_enabled'] = 1
-
-    def parameter_setting_btn_clicked(self):
-        motor_setting_dict = self.textedit_groups['motor_setting']
-
-        try:
-            self.rehab.motor_setting_dict['rom_safe_upper'] = float(motor_setting_dict['rom_safe_upper'].toPlainText())
-            self.rehab.motor_setting_dict['rom_safe_lower'] = float(motor_setting_dict['rom_safe_lower'].toPlainText())
-            self.rehab.motor_setting_dict['perpendicular_angle'] = float(motor_setting_dict['perpendicular_angle'].toPlainText())
-
-        except Exception as e:
-            print(f"[RMD 설정 실패] {e}")
-
-    def parameter_save_btn_clicked(self):
-        
-
-        data = {
-                'exercise_parameter': {
-                    'desired_velocity': self.rehab.exercise_para_dict['desired_velocity'],
-                    'desired_acceleration': self.rehab.exercise_para_dict['desired_acceleration'],
-                    'repeatation_number': self.rehab.exercise_para_dict['repeatation_number'],
-                    'hold_time': self.rehab.exercise_para_dict['hold_time'],
-                    'rom_upper': self.rehab.exercise_para_dict['rom_upper'],
-                    'rom_lower': self.rehab.exercise_para_dict['rom_lower'],
-                },
-                'passive_parameter': {
-                    'passive_p': self.rehab.passive_para_dict['passive_p'],
-                    'passive_i': self.rehab.passive_para_dict['passive_i'],
-                    'passive_d': self.rehab.passive_para_dict['passive_d'],
-                },
-                'assistance_parameter': {
-                    'assistance_gain_k': self.rehab.assistance_para_dict['assistance_gain_k'],
-                    'assistance_p': self.rehab.assistance_para_dict['assistance_p'],
-                    'assistance_i': self.rehab.assistance_para_dict['assistance_i'],
-                    'assistance_d': self.rehab.assistance_para_dict['assistance_d'],
-                    'assistance_muscle_p': self.rehab.assistance_para_dict['assistance_muscle_p'],
-                    'assistance_muscle_i': self.rehab.assistance_para_dict['assistance_muscle_i'],
-                    'assistance_muscle_d': self.rehab.assistance_para_dict['assistance_muscle_d'],
-                },
-                'resistance_parameter': {
-                    'resistance_moment': self.rehab.resistance_para_dict['resistance_moment'],
-                    'resistance_muscle_p': self.rehab.resistance_para_dict['resistance_muscle_p'],
-                    'resistance_muscle_i': self.rehab.resistance_para_dict['resistance_muscle_i'],
-                    'resistance_muscle_d': self.rehab.resistance_para_dict['resistance_muscle_d'],
-                },
-                'motor_setting_parameter': {
-                    'rom_safe_upper': self.rehab.motor_setting_dict['rom_safe_upper'],
-                    'rom_safe_lower': self.rehab.motor_setting_dict['rom_safe_lower'],
-                    'perpendicular_angle': self.rehab.motor_setting_dict['perpendicular_angle'],
-                },
-                'hydrodynamic_parameter': {
-                    'test_velocity_input': self.rehab.hydro_dict['test_velocity_input'],
-                    'test_acceleration_input': self.rehab.hydro_dict['test_acceleration_input'],
-                    'test_p_input': self.rehab.hydro_dict['test_p_input'],
-                    'test_i_input': self.rehab.hydro_dict['test_i_input'],
-                    'test_d_input': self.rehab.hydro_dict['test_d_input'],
-                    'test_rom_upper_input': self.rehab.hydro_dict['test_rom_upper_input'],
-                    'test_rom_lower_input': self.rehab.hydro_dict['test_rom_lower_input'],
-                    'test_hold_time_input': self.rehab.hydro_dict['test_hold_time_input'],
-                }
-            }
-
-
-        with open("custom_json/rehab.json", "w") as fw:
-            json.dump(data, fw, indent=4)
-
-
-    def hydrodynamic_test_setting_btn_clicked(self):
-        hydro_dict = self.textedit_groups['hydro']
-        try:
-            self.rehab.hydro_dict['test_velocity_input'] = float(hydro_dict['test_velocity_input'].toPlainText())
-            self.rehab.hydro_dict['test_acceleration_input'] = float(hydro_dict['test_acceleration_input'].toPlainText())
-            self.rehab.hydro_dict['test_p_input'] = float(hydro_dict['test_p_input'].toPlainText())
-            self.rehab.hydro_dict['test_i_input'] = float(hydro_dict['test_i_input'].toPlainText())
-            self.rehab.hydro_dict['test_d_input'] = float(hydro_dict['test_d_input'].toPlainText())
-            self.rehab.hydro_dict['test_rom_upper_input'] = float(hydro_dict['test_rom_upper_input'].toPlainText())
-            self.rehab.hydro_dict['test_rom_lower_input'] = float(hydro_dict['test_rom_lower_input'].toPlainText())
-            self.rehab.hydro_dict['test_hold_time_input'] = float(hydro_dict['test_hold_time_input'].toPlainText())
-        except Exception as e:
-            print(f"[RMD 설정 실패] {e}")   
-
-    def hydrodynamic_test_start_btn_clicked(self):
-        if self.checkboxes['hydrodynamic_constant_velocity_check']['status'] == True or self.checkboxes['hydrodynamic_constant_acceleration_check']['status'] == True:
+        if self.checkboxes['hydrodynamic_constant_velocity_check']['status'] == True or self.checkboxes['hydrodynamic_omega_check']['status'] == True:
             self.rehab.exercise_info_dict['control_active'] = 1
 
     def hydrodynamic_test_stop_btn_clicked(self):
-        if self.checkboxes['hydrodynamic_constant_velocity_check']['status'] == True or self.checkboxes['hydrodynamic_constant_acceleration_check']['status'] == True:
+        if self.checkboxes['hydrodynamic_constant_velocity_check']['status'] == True or self.checkboxes['hydrodynamic_omega_check']['status'] == True:
             self.rehab.exercise_info_dict['control_active'] = 0
 
     def const_angle_setting_btn_clicked(self):
         angle_dict = self.textedit_groups['const_angle']
         try:
-            self.rehab.const_angle_dict['const_angle_input'] = float(angle_dict['const_angle_input'].toPlainText())
+            self.rehab.const_angle_para_dict['const_angle'] = float(angle_dict['const_angle_input'].toPlainText())
+            self.rehab.const_angle_para_dict['const_angle_p'] = float(angle_dict['const_angle_p_input'].toPlainText())
+            self.rehab.const_angle_para_dict['const_angle_i'] = float(angle_dict['const_angle_i_input'].toPlainText())
+            self.rehab.const_angle_para_dict['const_angle_d'] = float(angle_dict['const_angle_d_input'].toPlainText())
         except Exception as e:
             print(f"[RMD angle 설정 실패] {e}")
 
     def const_angle_start_btn_clicked(self):
-        if self.checkboxes['desired_angle_move_check']['status'] == True:
+        if self.checkboxes['const_angle_move_check']['status'] == True:
             self.rehab.exercise_info_dict['control_active'] = 1
 
     def const_angle_stop_btn_clicked(self):
-        if self.checkboxes['desired_angle_move_check']['status'] == True:
+        if self.checkboxes['const_angle_move_check']['status'] == True:
             self.rehab.exercise_info_dict['control_active'] = 0
 
     def exercise_setting_btn_clicked(self):

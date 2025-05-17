@@ -28,18 +28,23 @@
         "resistance_muscle_d": 0.0
     },
     "motor_setting_parameter": {
-        "rom_safe_upper": 130.0,
-        "rom_safe_lower": 45.0,
-        "perpendicular_angle": 115.0
+        "rom_safe_upper": 150.0,
+        "rom_safe_lower": 30.0,
+        "perpendicular_angle": 113.0
     },
     "hydrodynamic_parameter": {
-        "test_velocity_input": 15.0,
-        "test_acceleration_input": 4.0,
-        "test_p_input": 1.5,
-        "test_i_input": 0.0,
+        "test_velocity_input": 20.0,
+        "test_omega_input": 1.0,
+        "test_p_input": 75.0,
+        "test_i_input": 1.0,
         "test_d_input": 0.0,
-        "test_rom_upper_input": 125.0,
-        "test_rom_lower_input": 50.0,
-        "test_hold_time_input": 2.0
+        "test_rom_upper_input": 135.0,
+        "test_rom_lower_input": 45.0,
+        "test_hold_time_input": 4.0
+    },
+    "const_angle_parameter": {
+        "const_angle_p": 3.5,
+        "const_angle_i": 1.0,
+        "const_angle_d": 0.0
     }
 }

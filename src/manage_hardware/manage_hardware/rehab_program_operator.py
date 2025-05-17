@@ -8,7 +8,7 @@ from rclpy.qos import QoSProfile
 
 from custom_module.thruster_torque_converter import thruster_converter
 from custom_module.passive_program import Passive_mode
-from RMD_custom import RMD# 가정한 모듈과 클래스 이름
+from custom_module.RMD_custom import RMD# 가정한 모듈과 클래스 이름
 # from FT_SENSOR_jh import FTSensor
 from custom_module.Muscle import Muscle
 

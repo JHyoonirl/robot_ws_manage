@@ -4,7 +4,7 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile
 from rclpy.executors import MultiThreadedExecutor
 # from FT_SENSOR import FTSensor
-from custom_module.FT_SENSOR_jh import FTSensor
+from custom_module.FT_SENSOR import FTSensor
 import time
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QPushButton, QVBoxLayout, QSpinBox, QLabel
 from PyQt5.QtCore import QTimer
@@ -141,7 +141,7 @@ class SensorApp(QMainWindow):
         
         self.force_data = [[], [], []]  # 각 축의 힘 데이터를 저장하는 리스트
         self.torque_data = [[], [], []]  # 각 축의 토크 데이터를 저장하는 리스트
-        self.move(900, 0)
+        self.move(1400, 0)
         self.show()
 
     def init_ui(self):

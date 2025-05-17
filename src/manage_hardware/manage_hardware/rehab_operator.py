@@ -41,6 +41,7 @@ class Rehab_program(Node):
         resistance_parameter = rehab_data['resistance_parameter']
         motor_setting_parameter = rehab_data['motor_setting_parameter']
         hydrodynamic_parameter = rehab_data['hydrodynamic_parameter']
+        const_angle_parameter = rehab_data['const_angle_parameter']
 
         ## ROS2 topic publisher/subscriber 설정
 
@@ -120,7 +121,7 @@ class Rehab_program(Node):
         self.control_mode = 0
         '''
         1. extension constant velocity
-        2. extension constant acceleration
+        2. sine
         3. passive exercise
         4. resistance exercise
         5. assistance exercise
@@ -215,20 +216,22 @@ class Rehab_program(Node):
                     'perpendicular_angle': motor_setting_parameter['perpendicular_angle']}
         
         self.hydro_dict = {'test_velocity_input': hydrodynamic_parameter['test_velocity_input'],
-                    'test_acceleration_input': hydrodynamic_parameter['test_acceleration_input'], 
+                    'test_omega_input': hydrodynamic_parameter['test_omega_input'], 
                     'test_p_input': hydrodynamic_parameter['test_p_input'],
                     'test_i_input': hydrodynamic_parameter['test_i_input'],
                     'test_d_input': hydrodynamic_parameter['test_d_input'],
                     'test_rom_upper_input': hydrodynamic_parameter['test_rom_upper_input'],
                     'test_rom_lower_input': hydrodynamic_parameter['test_rom_lower_input'],
                     'test_hold_time_input': hydrodynamic_parameter['test_hold_time_input'],}
-        self.const_angle_dict = {'const_angle': self.const_angle,
+        self.const_angle_para_dict = {'const_angle': self.const_angle,
+                                "const_angle_p": const_angle_parameter['const_angle_p'],
+                                "const_angle_i": const_angle_parameter['const_angle_i'],
+                                "const_angle_d": const_angle_parameter['const_angle_d']
                                  }
 
         self.timer = self.create_timer(0.01, self.rehab_control_pub)
 
     def rehab_control_pub(self):
-
         
         self.exercise_info_pub()
         self.exercise_parameter_pub()
@@ -290,7 +293,10 @@ class Rehab_program(Node):
         self.resistance_parameter_publisher.publish(msg)
     def const_angle_parameter_pub(self):
         msg = Float64MultiArray()
-        msg.data = [self.const_angle_dict['const_angle']]
+        msg.data = [self.const_angle_para_dict['const_angle'],
+                    self.const_angle_para_dict['const_angle_p'],
+                    self.const_angle_para_dict['const_angle_i'],
+                    self.const_angle_para_dict['const_angle_d']]
         self.const_angle_parameter_publisher.publish(msg)
 
     def motor_setting_parameter_pub(self):
@@ -304,7 +310,7 @@ class Rehab_program(Node):
     def motor_hydrodynamic_pub(self):
         msg = Float64MultiArray()
         msg.data = [self.hydro_dict['test_velocity_input'],
-                    self.hydro_dict['test_acceleration_input'],
+                    self.hydro_dict['test_omega_input'],
                     self.hydro_dict['test_p_input'],
                     self.hydro_dict['test_i_input'],
                     self.hydro_dict['test_d_input'],
@@ -323,6 +329,7 @@ class Rehab_program(Node):
     
     def motor_info_callback(self, msg):
         self.motor_power_enabled, self.motor_control_active, self.voltage, self.torque_current, self.motor_velocity, self.motor_angle, self.motor_knee_angle = msg.data
+        self.knee_angle = self.motor_knee_angle
 
 class Ros2Thread(QThread):
     def __init__(self, node):

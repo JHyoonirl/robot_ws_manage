@@ -14,6 +14,8 @@ import datetime
 import time
 from PyQt5 import uic
 import signal
+import openpyxl
+import traceback  # 파일 상단에 추가
 
 class DataSaver(Node):
     def __init__(self):
@@ -38,9 +40,9 @@ class DataSaver(Node):
         self.saving_status = False
 
 
-        self.thruster_status = 0
-        self.sensor_status = 0
-        self.motor_status = 0
+        self.thruster_status = True
+        self.sensor_status = True
+        self.motor_status = True
 
         self.data_sheet_thruster_signal = deque()
         self.data_sheet_force = deque()
@@ -109,6 +111,7 @@ class DataSaver(Node):
 
             data_entry = [formatted_time, self.thruster_signal]
             self.data_sheet_thruster_signal.append(data_entry)
+            # self.get_logger().info("{0}".format(data_entry))
             # self.last_pwm_save_time = time.time()
 
     def force_subscriber(self, msg):
@@ -121,6 +124,7 @@ class DataSaver(Node):
             
             data_entry = [formatted_time, self.force_x, self.force_y, self.force_z]
             self.data_sheet_force.append(data_entry)
+            # self.get_logger().info("{0}".format(data_entry))
             # self.last_force_save_time = time.time()
                 
 
@@ -134,6 +138,7 @@ class DataSaver(Node):
 
             data_entry = [formatted_time, self.torque_x, self.torque_y, self.torque_z]
             self.data_sheet_torque.append(data_entry)
+            # self.get_logger().info("{0}".format(data_entry))
             # self.last_force_save_time = time.time()
 
     def motor_subscriber(self, msg):
@@ -148,6 +153,7 @@ class DataSaver(Node):
                 self.motor_knee_angle, self.motor_velocity 
             ]
             self.data_sheet_motor.append(data_entry)
+            # self.get_logger().info("{0}".format(data_entry))
 
 class DataSaveApp(QMainWindow):
     def __init__(self, node: DataSaver):
@@ -158,10 +164,7 @@ class DataSaveApp(QMainWindow):
         self.thruster_signal = 0.0
         self.ui = uic.loadUi('UI/data_save.ui', self)
         self.init_ui()
-
-        self.thruster_status = True
-        self.sensor_status = True
-        self.motor_status = True
+        self.move(850,0)
         
         self.show()
 
@@ -210,20 +213,20 @@ class DataSaveApp(QMainWindow):
 
     def update_data(self):
         # with self.node.data_lock:
-        if self.thruster_status == True:
+        if self.node.thruster_status == True:
             self.Thruster_data_text.setPlainText(f'{self.node.thruster_signal:.2f}')
         else:
             self.Thruster_data_text.clear()
 
-        if self.sensor_status == True:
+        if self.node.sensor_status == True:
             self.Sensor_data_text.setPlainText(f'force: {self.node.force_x:.2f}, {self.node.force_y:.2f}, {self.node.force_z:.2f}')
             self.Sensor_data_text.append(f'torque: {self.node.torque_x:.2f}, {self.node.torque_y:.2f}, {self.node.torque_z:.2f}')
         else:
             self.Sensor_data_text.clear()
 
-        if self.motor_status == True:
+        if self.node.motor_status == True:
             # self.votage = self.angle = self.velocity
-            self.Motor_data_text.setPlainText(f'motor: {self.node.voltage:.2f}, {self.node.torque_current:.2f},{self.node.knee_angle:.2f}, {self.node.velocity:.2f}')
+            self.Motor_data_text.setPlainText(f'motor: {self.node.voltage:.2f}, {self.node.torque_current:.2f},{self.node.motor_knee_angle:.2f}, {self.node.motor_velocity:.2f}')
         else:
             self.Motor_data_text.clear()
     
@@ -274,24 +277,28 @@ class DataSaveApp(QMainWindow):
         # self.file_name = str('{0}_{1}'.format(int(self.thruster_signal), int(self.file_name_input.text())))
         if self.file_name:
             try:
-                # thruster_signal, Force, Torque 데이터 프레임 생성
-                if self.thruster_status == True:
-                    df_thruster_signal = pd.DataFrame(self.node.data_sheet_thruster_signal, columns=['Time', 'Thruster_signal'])
-                    df_thruster_signal.to_excel(f'{self.file_name}_thruster_signal.xlsx', index=False)
-                if self.sensor_status == True:
+                # 파일 이름에 확장자 추가
+                full_filename = f"{self.file_name}.xlsx"
+                with pd.ExcelWriter(full_filename, engine='openpyxl') as writer:
+                    # 각 데이터 저장 여부에 따라 DataFrame 생성 및 시트로 저장
+                    if self.node.thruster_status and self.node.data_sheet_thruster_signal:
+                        df_thruster = pd.DataFrame(self.node.data_sheet_thruster_signal, columns=['Time', 'Thruster_signal'])
+                        df_thruster.to_excel(writer, sheet_name='Thruster', index=False)
+                    if self.node.sensor_status and self.node.data_sheet_force:
+                        df_force = pd.DataFrame(self.node.data_sheet_force, columns=['Time', 'Force_X', 'Force_Y', 'Force_Z'])
+                        df_force.to_excel(writer, sheet_name='Force', index=False)
+                    if self.node.sensor_status and self.node.data_sheet_torque:
+                        df_torque = pd.DataFrame(self.node.data_sheet_torque, columns=['Time', 'Torque_X', 'Torque_Y', 'Torque_Z'])
+                        df_torque.to_excel(writer, sheet_name='Torque', index=False)
+                    if self.node.motor_status and self.node.data_sheet_motor:
+                        df_motor = pd.DataFrame(self.node.data_sheet_motor, columns=['Time', 'voltage', 'torque_current', 'angle', 'velocity'])
+                        df_motor.to_excel(writer, sheet_name='Motor', index=False)
 
-                    df_force = pd.DataFrame(self.node.data_sheet_force, columns=['Time', 'Force_X', 'Force_Y', 'Force_Z'])
-                    df_force.to_excel(f'{self.file_name}_force.xlsx', index=False)
-                    df_torque = pd.DataFrame(self.node.data_sheet_torque, columns=['Time', 'Torque_X', 'Torque_Y', 'Torque_Z'])
-                    df_torque.to_excel(f'{self.file_name}_torque.xlsx', index=False)
-                if self.motor_status == True:
-                    df_motor = pd.DataFrame(self.node.data_sheet_motor, columns=['Time', 'voltage', 'torque_current', 'angle', 'velocity'])
-                    df_motor.to_excel(f'{self.file_name}_motor.xlsx', index=False)
-                
-                print(f'Data saved to {self.file_name}')
+                print(f"Data saved to {full_filename}")
                 self.Save_status_text.setText("Data save complete")
             except Exception as e:
-                print(f"Error saving data: {e}")
+                traceback.print_exc()  # 터미널에 출력
+                self.node.get_logger().error("Data save error:\n" + traceback.format_exc())
                 self.Save_status_text.setText("Data save failed")
         else:
             print("Please enter a file name.")

@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 import threading
 import time
 import json
+import math
+import numpy as np
 
 @dataclass
 class PIDGains:
@@ -93,6 +95,8 @@ class Motor(Node):
         self.temperature = 0.0     # Motor temperature
         self.torque_current = 0.0  # Motor torque current
         self.motor_velocity = 0.0  # Motor angular velocity
+        self.motor_velocity_test = 0.0
+        self.motor_velocity_prev = 0.0
         self.motor_angle = 0.0     # Motor angle
         self.motor_knee_angle = 0.0 # Motor knee angle
 
@@ -128,7 +132,7 @@ class Motor(Node):
         self.control_mode = 0
         '''
         1. extension constant velocity
-        2. extension constant acc
+        2. sine
         3. passive exercise
         4. resistance exercise
         5. assistance exercise
@@ -158,7 +162,7 @@ class Motor(Node):
         self.hydrodynamic_test_err_state = ControlError()
 
         self.hydrodynamic_test_desired_velocity = 0.0
-        self.hydrodynamic_test_desired_acceleration = 0.0
+        self.hydrodynamic_test_desired_omega = 0.0
         
         self.hydrodynamic_test_gains = PIDGains()
 
@@ -173,14 +177,18 @@ class Motor(Node):
         self.assistance_gains = PIDGains() # assistance gains
 
 
+        # const angle parameter
         self.const_angle = 90
+
+        self.const_angle_err_state = ControlError()
+        self.const_angle_gains = PIDGains()
 
 
         status = self.RMD.motor_initialization()
         self.past_time = time.time()
         
         if status == True:
-            self.timer = self.create_timer(0.01, self.ros2_callback) # 10ms 마다 motor 상태 정보 publish
+            self.timer = self.create_timer(0.0075, self.ros2_callback) # 10ms 마다 motor 상태 정보 publish
             print('Motor thread started')
 
     def ros2_callback(self):
@@ -191,6 +199,11 @@ class Motor(Node):
 
         self.voltage, self.temperature, self.torque_current, self.motor_velocity, self.motor_angle, error = self.RMD.status_motor() # motor raw status 호출
         self.motor_knee_angle = self.motor_angle - self.perpendicular_angle + 90
+
+        # alpha = 0.7
+        # self.motor_velocity_test = alpha * self.motor_velocity + (1 - alpha) * self.motor_velocity_prev
+        # self.motor_velocity_prev = self.motor_velocity_test
+        # self.get_logger().info('{0}'.format(self.motor_velocity_test))
 
 
         motor_info = Float64MultiArray()
@@ -218,8 +231,6 @@ class Motor(Node):
                 
                 return self.power_enabled
             
-            if self.control_active != 1:
-                return self.power_enabled
             
             if self.muscle_passive_component_switch == 1:
                 torque = self.muscle.M_passive(self.motor_knee_angle, self.motor_velocity)
@@ -227,11 +238,12 @@ class Motor(Node):
                 torque_LSB = self.muscle.torque_to_LSB(torque)
                 self.get_logger().info(f"muscle passive torque LSB: {torque_LSB}")
                 self.RMD.torque_closed_loop(int(torque_LSB))
+
+            
             if self.control_mode == 1: # 등각속도 운동
                 self.motor_constant_velocity()
-            elif self.control_mode == 2: # 등각가속도 운동
-                # pass
-                self.motor_constant_acc()
+            elif self.control_mode == 2: # sine
+                self.motor_sine()
             elif self.control_mode == 3: # passive exercise
                 pass
                 # self.motor_passive()
@@ -242,8 +254,7 @@ class Motor(Node):
                 pass
                 # self.motor_assistance()
             elif self.control_mode == 6: # angle move
-                pass
-                # self.motor_angle_move()
+                self.motor_angle_move()
             self.past_time = time.time()
             self.power_enabled_prev = self.power_enabled
             return self.power_enabled
@@ -254,98 +265,192 @@ class Motor(Node):
 
     ############### motor control function ###############
     def motor_constant_velocity(self):
-        
-        hydrodynamic_test_desired_angle = self.const_vel_angle_generator(self.hydrodynamic_test_desired_velocity)
-        self.get_logger().info(f"desired_angle: {hydrodynamic_test_desired_angle }")
-        # self.get_logger().info(f"Desired angle: {self.hydrodynamic_test_desired_angle}")
         try:
+            self.dt = time.time() - self.past_time
+            hydrodynamic_test_desired_input, state = self.const_vel_control_generator(self.hydrodynamic_test_desired_velocity)
+                     
+        
+            self.pos_error = hydrodynamic_test_desired_input - self.motor_knee_angle
+            
+            if state == 0: ## 위치 이동
+                gain_p = self.const_angle_gains.proportional
+                gain_i = self.const_angle_gains.integral
+                gain_d = self.const_angle_gains.derivative
+                self.get_logger().info(f"desired_input: {hydrodynamic_test_desired_input }")  
+
+                # PID 계산
+                proportional = gain_p * self.pos_error
+                self.hydrodynamic_test_err_state.errorintegral += self.pos_error * self.dt
+                integral = gain_i * self.hydrodynamic_test_err_state.errorintegral
+                derivative = gain_d * (self.pos_error - self.hydrodynamic_test_err_state.errorprev) / self.dt
+                self.hydrodynamic_test_err_state.errorprev = self.pos_error
+
+                if self.control_active == 0:
+                    self.hydrodynamic_test_err_state.errorintegral = 0.0
+                    self.hydrodynamic_test_err_state.errorprev = 0.0
+                    self.hydrodynamic_test_err_state.errorderivative = 0.0
+                    proportional = 0
+                    integral = 0
+                    derivative = 0
+
+                output = proportional + integral + derivative
+                temperature, torque, speed, angle = self.RMD.torque_closed_loop(int(output))
+
+
+            elif state == 1:
+                desired_velocity = hydrodynamic_test_desired_input
+                '''
+                unit [deg/s]
+                '''
+                desired_LSB = 100 * desired_velocity
+                '''
+                0.01 deg/s = 1LSB
+                1 deg/s = 100LSB
+                '''
+                self.get_logger().info("input vel: {0}".format(desired_LSB))
+                temperature, torque, speed, angle = self.RMD.speed_closed_loop(int(desired_LSB))
+                self.get_logger().info("output vel:{0}".format(speed))
+
+            else: # state == 2:
+                
+                temperature, torque, speed, angle = self.RMD.torque_closed_loop(int(0))
+
+        except Exception as e:
+            print(f'Error2: {e}')
+
+
+    def const_vel_control_generator(self, velocity):
+        now = time.time()
+        t = now - self.control_time_stamp  # 제어 시작 이후 경과 시간
+
+        if t < self.hydrodynamic_test_hold_time:
+            return self.hydrodynamic_test_romconfig.upper, 0 # 일정 시간 유지 후 감속 시작
+
+        # 감속 phase
+        t_vel = t - self.hydrodynamic_test_hold_time
+        theta_0 = self.hydrodynamic_test_romconfig.upper  # 감속 시작 시점의 각도
+        omega_0 = - velocity
+
+        desired_angle = theta_0 + omega_0 * t_vel
+
+        if desired_angle < self.hydrodynamic_test_romconfig.lower:
+            desired_angle = self.hydrodynamic_test_romconfig.lower
+            return desired_angle, 2
+
+        # if t < math.sqrt(2*(self.hydrodynamic_test_romconfig.upper - self.hydrodynamic_test_romconfig.lower)/acc):
+        desired_velocity = - velocity
+        return desired_velocity, 1
+        
+    def motor_sine(self):
+        # self.get_logger().info(f"control mode: {self.control_mode}")
+        self.dt = time.time() - self.past_time
+
+        self.test_desired_input, state = self.sine_control_generator(self.hydrodynamic_test_desired_omega)
+        self.pos_error = self.test_desired_input - self.motor_knee_angle
+
+        
+        
+        if state == 0: ## 위치 이동
+            gain_p = self.const_angle_gains.proportional
+            gain_i = self.const_angle_gains.integral
+            gain_d = self.const_angle_gains.derivative
+            
+
+            # PID 계산
+            proportional = gain_p * self.pos_error
+            self.hydrodynamic_test_err_state.errorintegral += self.pos_error * self.dt
+            integral = gain_i * self.hydrodynamic_test_err_state.errorintegral
+            derivative = gain_d * (self.pos_error - self.hydrodynamic_test_err_state.errorprev) / self.dt
+            self.hydrodynamic_test_err_state.errorprev = self.pos_error
+
+            
             if self.control_active == 0:
                 self.hydrodynamic_test_err_state.errorintegral = 0.0
                 self.hydrodynamic_test_err_state.errorprev = 0.0
                 self.hydrodynamic_test_err_state.errorderivative = 0.0
+                
+                proportional = 0
+                integral = 0
+                derivative = 0
+
+            output = proportional + integral + derivative
             
-            self.dt = time.time() - self.past_time
-            self.get_logger().info(f"dt: {self.dt}")
-            self.pos_error = hydrodynamic_test_desired_angle - self.motor_knee_angle
-
-            # Proportional term
-            proportional = self.hydrodynamic_test_gains.proportional * self.pos_error
-
-            # Integral term
-            self.hydrodynamic_test_err_state.errorintegral += self.pos_error * self.dt
-            integral = self.hydrodynamic_test_gains.integral * self.hydrodynamic_test_err_state.errorintegral
-
-            # Derivative term
-            derivative = self.hydrodynamic_test_gains.derivative * (self.pos_error - self.hydrodynamic_test_err_state.errorprev) / self.dt
-
-            # Update previous error
-            self.hydrodynamic_test_err_state.errorprev = self.pos_error
-
-            # Calculate the control output
-            output = proportional + integral + derivative
+            self.get_logger().info("{0}".format(output))
 
             temperature, torque, speed, angle = self.RMD.torque_closed_loop(int(output))
-            # self.get_logger().info('rmd torque, speed, angle: {0}'.format(torque, speed, angle))
-
-        except Exception as e:
-            print(f'Error2: {e}')
 
 
-    def const_vel_angle_generator(self, velocity):
-        now = time.time()
-        t = now - self.control_time_stamp  # 제어 시작 이후 경과 시간
-        self.get_logger().info(f"t: {t}")
-        if t < self.hydrodynamic_test_hold_time:
-            return self.hydrodynamic_test_romconfig.upper # 일정 시간 유지 후 감속 시작
-        
-        t = now - self.control_time_stamp - self.hydrodynamic_test_hold_time  # 감속 시작 이후 경과 시간
-        
-        desired_angle = self.hydrodynamic_test_romconfig.upper - velocity * (t)
-        
-        if desired_angle < self.hydrodynamic_test_romconfig.lower:
-            desired_angle = self.hydrodynamic_test_romconfig.lower
-        
-        return desired_angle
-        
-    def motor_constant_acc(self):
-        try:
-            self.dt = time.time() - self.past_time
-            self.test_desired_angle = self.const_acc_angle_generator(self.hydrodynamic_test_desired_acceleration)
-            self.pos_error = self.test_desired_angle - self.motor_knee_angle
+        elif state == 1:
+            desired_velocity = self.test_desired_input
+            '''
+            unit [deg/s]
+            '''
+            desired_LSB = 100 * desired_velocity
+            '''
+            0.01 deg/s = 1LSB
+            1 deg/s = 100LSB
+            '''
+            # self.get_logger().info("{0}".format(desired_LSB))
+            
+            temperature, torque, speed, angle = self.RMD.speed_closed_loop(int(desired_LSB))
+            self.get_logger().info("{0}".format(desired_velocity - speed))
 
-            # PID 계산
-            proportional = self.hydrodynamic_test_gains.proportional * self.pos_error
-            self.pos_error_integral += self.pos_error * self.dt
-            integral = self.hydrodynamic_test_gains.integral * self.pos_error_integral
-            derivative = self.hydrodynamic_test_gains.derivative * (self.pos_error - self.pos_error_prev) / self.dt
-            self.pos_error_prev = self.pos_error
+        else: # state == 2:
+            
+            temperature, torque, speed, angle = self.RMD.torque_closed_loop(int(0))
 
-            output = proportional + integral + derivative
-            temperature, torque, speed, angle = self.RMD.torque_closed_loop(int(output))
-
-        except Exception as e:
-            print(f'Error2: {e}')
+        # except Exception as e:
+        #     self.get_logger().info("{0}".format(e))
 
 
-    def const_acc_angle_generator(self, acc):
+    def sine_control_generator(self, omega_input):
         
         now = time.time()
         t = now - self.control_time_stamp  # 제어 시작 이후 경과 시간
+        # self.get_logger().info("{0}".format(self.control_active))
+        if self.control_active == 0:
+            return 0, 0
+        
+        amplitude = (self.hydrodynamic_test_romconfig.upper - self.hydrodynamic_test_romconfig.lower) / 2
+        omega = omega_input
+        '''
+        unit 1/s
+        '''
 
         if t < self.hydrodynamic_test_hold_time:
-            return self.hydrodynamic_test_romconfig.upper # 일정 시간 유지 후 감속 시작
+            return 90, 0 # 일정 시간 유지 후 감속 시작
 
         # 감속 phase
-        t_acc = t - self.hydrodynamic_test_hold_time
-        theta_0 = self.hydrodynamic_test_romconfig.upper  # 감속 시작 시점의 각도
-        omega_0 = 0.0  # 정지 상태에서 출발
-        alpha = -abs(acc)  # 음의 가속도로 감소
+        t_sine = t - self.hydrodynamic_test_hold_time
+        desired_vel = amplitude * omega * math.cos(omega*t_sine)
+        return desired_vel, 1
+    
+    def motor_angle_move(self):
+        self.dt = time.time() - self.past_time
 
-        desired_angle = theta_0 + omega_0 * t_acc + 0.5 * alpha * t_acc**2
+        self.pos_error = self.const_angle - self.motor_knee_angle
 
-        if desired_angle < self.hydrodynamic_test_romconfig.lower:
-            desired_angle = self.hydrodynamic_test_romconfig.lower
-        return desired_angle
+        # PID 계산
+        proportional = self.const_angle_gains.proportional * self.pos_error
+        self.const_angle_err_state.errorintegral += self.pos_error * self.dt
+        integral = self.const_angle_gains.integral * self.const_angle_err_state.errorintegral
+        derivative = self.const_angle_gains.derivative * (self.pos_error - self.const_angle_err_state.errorprev) / self.dt
+        self.const_angle_err_state.errorprev = self.pos_error
+
+        if self.control_active == 0:
+            self.const_angle_err_state.errorintegral = 0.0
+            self.const_angle_err_state.errorprev = 0.0
+            self.const_angle_err_state.errorderivative = 0.0
+            proportional = 0
+            integral = 0
+            derivative = 0
+
+        output = proportional + integral + derivative
+        # self.get_logger().info("torque input: {0}".format(output))
+        temperature, torque, speed, angle = self.RMD.torque_closed_loop(int(output))
+        # self.get_logger().info("torque output: {0}".format(torque))
+        # print(torque)
+        
     
     ############### motor ROS2 callback function ###############
     def exercise_info_callback(self, msg):
@@ -394,7 +499,7 @@ class Motor(Node):
         try:
             # self.get_logger().info(f"Received hydrodynamic control info: {msg.data}")
             self.hydrodynamic_test_desired_velocity = msg.data[0]
-            self.hydrodynamic_test_desired_acceleration = msg.data[1]
+            self.hydrodynamic_test_desired_omega= msg.data[1]
             self.hydrodynamic_test_gains.proportional = msg.data[2]
             self.hydrodynamic_test_gains.integral = msg.data[3]
             self.hydrodynamic_test_gains.derivative = msg.data[4]
@@ -427,6 +532,9 @@ class Motor(Node):
         try:
             # self.get_logger().info(f"Received const angle parameter: {msg.data}")
             self.const_angle = msg.data[0]
+            self.const_angle_gains.proportional = msg.data[1]
+            self.const_angle_gains.integral = msg.data[2]
+            self.const_angle_gains.derivative = msg.data[3]
         except Exception as e:
             print(f'Error const angle: {e}')
 

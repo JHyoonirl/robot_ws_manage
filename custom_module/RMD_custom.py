@@ -170,23 +170,20 @@ class RMD:
         """
         response = self.read_pid()
         init_data = response.data
-        self.kp_cur = init_data[2]
-        self.ki_cur = init_data[3]
-        self.kp_vel = init_data[4]
-        self.ki_vel = init_data[5]
-        self.kp_pos = init_data[6]
-        self.ki_pos = init_data[7]
+        self.kp_cur = 200
+        self.ki_cur = 100
+        self.kp_vel = 200
+        self.ki_vel = 20
+        self.kp_pos = 100
+        self.ki_pos = 0
 
-        print(self.kp_cur, self.ki_cur)
-        print(self.kp_vel, self.ki_vel)
-        print(self.kp_pos, self.ki_pos)
         init_data = [
-            self.byteArray(self.kp_cur, 1) ,
-            self.byteArray(self.ki_cur, 1),
-            self.byteArray(self.kp_vel, 1),
-            self.byteArray(self.ki_vel, 1),
-            self.byteArray(self.kp_pos, 1),
-            self.byteArray(self.ki_pos, 1)
+            self.byteArray(self.kp_cur, 1, False) ,
+            self.byteArray(self.ki_cur, 1, False),
+            self.byteArray(self.kp_vel, 1, False),
+            self.byteArray(self.ki_vel, 1, False),
+            self.byteArray(self.kp_pos, 1, False),
+            self.byteArray(self.ki_pos, 1, False)
         ]
         # 바이트 배열을 하나의 플랫 리스트로 변환
         flat_data = [item for sublist in init_data for item in sublist]
@@ -367,7 +364,7 @@ class RMD:
     def speed_closed_loop(self, speed_input):
         speed_array = [0x00, 0x00, 0x00, 0x00]
         speed_array[0:4] = self.byteArray(speed_input, 4)
-        print(speed_array)
+        # print(speed_array)
         data_array =  self.raw_speed_closed_loop(speed_array).data
         temperature = int(data_array[1])
         torque = int.from_bytes(data_array[2:4], byteorder='little', signed=True)
@@ -423,6 +420,6 @@ class RMD:
         return self.send_cmd(message, 0.001)
 
     
-    def byteArray(self, data, size):
+    def byteArray(self, data, size, signed=True):
         ''' data must be a list that is consisted of hex components '''
-        return data.to_bytes(size, 'little', signed=True)
+        return data.to_bytes(size, 'little', signed=signed)
