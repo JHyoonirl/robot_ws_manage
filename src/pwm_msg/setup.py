@@ -23,7 +23,7 @@ setup(
     maintainer_email='face5921@naver.com',
     description='TODO: Package description',
     license='TODO: License declaration',
-    tests_require=[''],
+    # tests_require=[''],
     entry_points={
         'console_scripts': [
             'pwm_publisher = pwm_msg.pwm_publisher:main',

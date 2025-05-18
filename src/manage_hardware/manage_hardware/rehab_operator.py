@@ -4,6 +4,7 @@ from PyQt5.QtCore import QTimer, Qt, QThread
 import sys
 import rclpy
 from std_msgs.msg import Float64, Float64MultiArray
+from geometry_msgs.msg import Vector3
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
 from rclpy.executors import MultiThreadedExecutor
@@ -57,7 +58,7 @@ class Rehab_program(Node):
         self.exercise_desired_trajectory_velocity_publisher = self.create_publisher(
             Float64, 'desired_vtrajectory_velocity', self.qos_profile)
         
-        self.exercise_trjactory_state_publisher = self.create_publisher(
+        self.exercise_trajectory_state_publisher = self.create_publisher(
             Float64, 'trajectory_state', self.qos_profile)
         
         self.exercise_info_publisher = self.create_publisher(
@@ -85,9 +86,21 @@ class Rehab_program(Node):
             Float64MultiArray, 'Motor_hydrodynamic_control_info', self.qos_profile)
         
         self.imu_knee_angle_subscriber = self.create_subscription(
-            Float64,
-            'imu_knee_angle',
+            Vector3,
+            'imu_data_shank',
             self.imu_knee_angle_callback,
+            self.qos_profile)
+        
+        self.imu_velocity_subscriber = self.create_subscription(
+            Float64,
+            'imu_data_velocity',
+            self.imu_velocity_callback,
+            self.qos_profile)
+        
+        self.imu_acceleration_subscriber = self.create_subscription(
+            Float64,
+            'imu_data_acceleration',
+            self.imu_acceleration_callback,
             self.qos_profile)
         
         self.thruster_info_subscriber = self.create_subscription(
@@ -135,13 +148,6 @@ class Rehab_program(Node):
         desired exercise knee velocity [deg/s]
         '''
 
-        self.exercise_state = 0
-        '''
-        0: stop
-        1: start
-        2: hold
-        '''
-
         self.repeatation_number = exercise_parameter['repeatation_number']
         self.hold_time = exercise_parameter['hold_time']
 
@@ -181,9 +187,18 @@ class Rehab_program(Node):
         ####### imu variable #######
         ############################
 
-        self.imu_knee_angle = 0.0
+        self.imu_knee_angle_deg = 0.0
         '''
         knee angle from IMU [deg]
+        '''
+
+        self.imu_knee_velocity_deg = 0.0
+        '''
+        knee velocity from IMU [deg/s]
+        '''
+        self.imu_knee_acceleration_deg = 0.0
+        '''
+        knee acceleration from IMU [deg/s^2]
         '''
 
         #################################
@@ -280,21 +295,64 @@ class Rehab_program(Node):
 
     def rehab_program_loop(self):
         self.control_mode = self.exercise_info_dict['control_mode']
+        self.control_active = self.exercise_info_dict['control_active']
         if self.control_mode == 3: # passive mode
-            pass
+            if self.control_active == 0:
+                self.Passive_rehab_module.state = 0
+                self.Passive_rehab_module.repeatation_memory = 0
+                self.desired_trajectory_position = self.Passive_rehab_module.desired_angle
+                self.desired_trajectory_velocity = self.Passive_rehab_module.dtheta_desired_current
+                self.desired_trajectory_state = self.Passive_rehab_module.state
+            else:    
+                self.Passive_rehab_module.current_position = self.imu_knee_angle_deg
+                self.Passive_rehab_module.control_generator()
+                self.Passive_rehab_module.desired_position_generator()
+                self.Passive_rehab_module.desired_position_trajectory_generator()
+                self.desired_trajectory_position = self.Passive_rehab_module.desired_angle
+                self.desired_trajectory_velocity = self.Passive_rehab_module.dtheta_desired_current
+                self.desired_trajectory_state = self.Passive_rehab_module.state
+                
         elif self.control_mode == 4: # assistance mode
-            pass
-        elif self.control_mode == 5: # assistance mode
-            pass
+            if self.control_active == 0:
+                self.Assistance_rehab_module.state = 0
+                self.Assistance_rehab_module.repeatation_memory = 0
+                self.desired_trajectory_position = self.Assistance_rehab_module.desired_angle
+                self.desired_trajectory_velocity = 0
+                self.desired_trajectory_state = self.Assistance_rehab_module.state
+            else:
+                self.Assistance_rehab_module.current_position = self.imu_knee_angle_deg
+                self.Assistance_rehab_module.control_generator()
+                self.Assistance_rehab_module.desired_position_generator()
+                self.Assistance_rehab_module.desired_position_and_velocity_trajectory_generator()
+                self.desired_trajectory_position = self.Assistance_rehab_module.desired_angle
+                self.desired_trajectory_velocity = self.Assistance_rehab_module.dtheta_desired_current
+                self.desired_trajectory_state = self.Assistance_rehab_module.state
+            
+        elif self.control_mode == 5: # resistance mode
+            if self.control_active == 0:
+                self.Resistance_rehab_module.state = 0
+                self.Resistance_rehab_module.repeatation_memory = 0
+                self.desired_trajectory_position = self.Resistance_rehab_module.desired_angle
+                self.desired_trajectory_velocity = 0
+                self.desired_trajectory_state = self.Resistance_rehab_module.state
+            else:
+                self.Resistance_rehab_module.current_position = self.imu_knee_angle_deg
+                self.Resistance_rehab_module.control_generator()
+                self.Resistance_rehab_module.desired_position_generator()
+                self.Resistance_rehab_module.desired_position_and_velocity_trajectory_generator()
+                self.desired_trajectory_position = self.Resistance_rehab_module.desired_angle
+                self.desired_trajectory_velocity = self.Resistance_rehab_module.dtheta_desired_current
+                self.desired_trajectory_state = self.Resistance_rehab_module.state
         else:
             pass
+        self.desired_trajectory_position_pub()
+        self.desired_trajectory_velocity_pub()
+        self.exercise_trajectory_state_pub()
         self.past_time = time.time()
 
 
     def rehab_control_pub(self):
-        self.desired_trajectory_position_pub()
-        self.desired_trajectory_velocity_pub()
-        self.exercise_trajectory_state_publisher()
+        
         self.exercise_info_pub()
         self.exercise_parameter_pub()
         self.passive_parameter_pub()
@@ -314,10 +372,10 @@ class Rehab_program(Node):
         msg.data = float(self.desired_trajectory_velocity)
         self.exercise_desired_trajectory_velocity_publisher.publish(msg)
 
-    def exercise_trajectory_state_publisher(self):
+    def exercise_trajectory_state_pub(self):
         msg = Float64()
-        msg.data = float(self.exercise_state)
-        self.exercise_trjactory_state_publisher.publish(msg)
+        msg.data = float(self.desired_trajectory_state)
+        self.exercise_trajectory_state_publisher.publish(msg)
 
     def exercise_info_pub(self):
         msg = Float64MultiArray()
@@ -394,9 +452,18 @@ class Rehab_program(Node):
 
 
     ###### subscriber callback ######
-    def imu_knee_angle_callback(self, msg):
-        self.imu_knee_angle = msg.data
-        # print(f"IMU Knee Angle: {self.knee_angle:.2f}")
+    def imu_knee_angle_callback(self, msg:Vector3):
+        self.imu_knee_angle_deg = msg.x
+        # print(f"IMU Knee Angle: {self.imu_knee_angle_deg:.2f}")
+
+    def imu_velocity_callback(self, msg: Float64):
+        self.imu_knee_velocity_deg = msg.data
+        # print(f"IMU Knee Velocity: {self.imu_knee_velocity_deg:.2f}")
+
+    def imu_acceleration_callback(self, msg: Float64):
+        self.imu_knee_acceleration_deg = msg.data
+        # print(f"IMU Knee Acceleration: {self.imu_knee_acceleration_deg:.2f}")
+
     def thruster_info_callback(self, msg):
         pass
     

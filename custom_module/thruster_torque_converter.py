@@ -132,14 +132,14 @@ class thruster_converter:
         
         for torque in torques:
             if torque < 0:
-                estimated_rpm.append(self.reverse_convert_torque_to_rpm(torque))
+                estimated_rpm.append(self.torque_to_percentage(torque))
                 
             else:
-                estimated_rpm.append(self.forward_convert_torque_to_rpm(torque))
+                estimated_rpm.append(self.torque_to_percentage(torque))
                 
         plt.figure(figsize=(10, 6))
-        plt.plot(self.forward_torque, self.rpm_for_torque_forward, 'r-', label='Actual Rad/s')
-        plt.plot(self.reverse_torque, self.rpm_for_torque_reverse, 'g-', label='Actual Rad/s--')
+        # plt.plot(self.forward_torque, self.rpm_for_torque_forward, 'r-', label='Actual Rad/s')
+        # plt.plot(self.reverse_torque, self.rpm_for_torque_reverse, 'g-', label='Actual Rad/s--')
         plt.plot(torques, estimated_rpm, 'b-', label='estimated Rad/s--')
         plt.title('Comparison of Actual and Estimated Rad/s Values')
         plt.xlabel('Torque (Nm)')

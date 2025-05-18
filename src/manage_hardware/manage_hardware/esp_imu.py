@@ -73,7 +73,7 @@ class ESP32Board(Node):
         
         self.esp_serial()
         if self.status:
-            self.create_timer(0.0125, self.publish_imu_data)
+            self.create_timer(0.0105, self.publish_imu_data)
             # self.create_timer(0.005, self.publish_etc_data)
 
 
@@ -87,16 +87,17 @@ class ESP32Board(Node):
             return
 
         data = self.parse_imu_data(line)
-        if not data or not all(k in data for k in ('r', 'p', 'y')):
-            self.get_logger().warn(f"Invalid data: {line}")
+        required_keys = ('r', 'p', 'y', 'gyro_x', 'gyro_y', 'gyro_z')
+        if not data or not all(k in data for k in required_keys):
+            self.get_logger().warn(f"Invalid or incomplete data: {line}")
             return
 
         imu_msg = Vector3()
         '''
         deg
         '''
-        imu_msg.x = (-data['r'] + 90) / 16.00
-        self.get_logger().info(f"IMU data: {imu_msg.x}")
+        imu_msg.x = ( - data['r'] ) / 16.00 + 93.3
+        # self.get_logger().info(f"IMU data: {imu_msg.x}")s
         imu_msg.y = data['p'] / 16.00
         imu_msg.z = data['y'] / 16.00
 
@@ -114,50 +115,38 @@ class ESP32Board(Node):
         # Publish the smoothed imu_msg
         self.imu_shank.publish(self.smoothed_imu_msg)
 
-        self.current_angle = imu_msg.x
+        # angular velocity from gyro_x directly
+        angular_velocity = data['gyro_x'] / 16.0
+
+        # compute acceleration
         now = time.time()
         dt = now - self.previous_time
-
-        vel_msg = Float64()
-        '''
-        deg/s
-        '''
         acc_msg = Float64()
-        '''
-        deg/s^2
-        '''
-
+        vel_msg = Float64()
+        alpha = 0.3  # Low-pass filter coefficient (adjustable for smoothing level)
         if dt > 0:
-            velocity = (self.current_angle - self.previous_angle) / dt
-            acceleration = (velocity - self.previous_velocity) / dt
-
-            vel_msg.data = velocity * 1000000  # 단위 스케일 조정
-            self.smoothed_acceleration = 0.8 * self.smoothed_acceleration + 0.2 * acceleration
+            acc_raw = (angular_velocity - self.previous_velocity) / dt
+            self.smoothed_acceleration = (1 - alpha) * self.smoothed_acceleration + alpha * acc_raw
             acc_msg.data = self.smoothed_acceleration
-
-            self.imu_velocity.publish(vel_msg)
             self.imu_acceleration.publish(acc_msg)
 
-        self.imu_shank.publish(imu_msg)
+        vel_msg.data = angular_velocity
+        self.imu_velocity.publish(vel_msg)
 
-        self.previous_angle = self.current_angle
-        self.previous_velocity = velocity
+        self.prev_velocity = angular_velocity
         self.previous_time = now
-
-            
-        
-
-        
+  
         
     # -------------  공통 사용 함수 정의 -----------
     
     def parse_imu_data(self,line: str):
         try:
-            # ex) "i:1,r:123,p:456,y:789" -> {'i': 1, 'r': 123, 'p': 456, 'y': 789}
-            pattern = r'([a-z]):([-+]?[0-9]*\.?[0-9]+)'
+            line = line.strip()
+            pattern = r'(\w+):([-+]?[0-9]*\.?[0-9]+)'
             matches = re.findall(pattern, line)
             return {key: float(val) for key, val in matches}
         except Exception as e:
+            self.get_logger().warn(f"Parse error: {e}")
             return None
     
     def esp_serial(self):

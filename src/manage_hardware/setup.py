@@ -24,7 +24,7 @@ setup(
     maintainer_email='irl@todo.todo',
     description='TODO: Package description',
     license='TODO: License declaration',
-    tests_require=[''],
+    # tests_require=[''],
     entry_points={ 
         'console_scripts': [
             'sensor_operator = manage_hardware.sensor_operator:main',

@@ -13,19 +13,24 @@ class Passive_rehab:
         self.time_stamp = 0
 
         self.desired_position_end = 0
-        self.desired_position_start = 0
-        self.dtheta_desired_current = 0
-
-        self.desired_angle = 0
-        self.current_position = self.rehab.imu_knee_angle
         '''
         unit: [deg]
         '''
+        self.desired_position_start = 0
         '''
-        나중에 센서값을 변경해야 함!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        
+        unit: [deg]
         '''
-        self.current_velocity = 0
+        self.dtheta_desired_current = 0
+
+        self.desired_angle = 0
+        self.current_position = self.rehab.imu_knee_angle_deg
+        '''
+        unit: [deg]
+        '''
+        self.current_velocity = self.rehab.imu_knee_velocity_deg
+        '''
+        unit: [deg/s]
+        '''
 
         self.repeatation_memory = 0 
         '''
@@ -47,7 +52,7 @@ class Passive_rehab:
         '''
         Passive mode 진행 프로토콜을 Main loop로 실행되는 부분
         '''
-        self.current_position = self.rehab.imu_knee_angle
+        self.current_position = self.rehab.imu_knee_angle_deg
         
         self.control_generator()
         self.desired_position_generator()
@@ -61,14 +66,16 @@ class Passive_rehab:
         '''
         Passive mode에서 시간에 따른 signal 생성
         '''
-
+        self.dTheta = self.rehab.exercise_para_dict['desired_velocity']
+        self.ddTheta = self.rehab.exercise_para_dict['desired_acceleration']
+        
         if self.state == 0:
             self.signal = 1
             self.state = 1
             self.time_stamp = time.time()
             self.desired_angle = self.current_position
             
-        elif self.state == 1 and abs(self.desired_position_end - self.current_position) < 2 and abs(self.current_velocity) < 0.05:
+        elif self.state == 1 and abs(self.desired_position_end - self.current_position) < 2 and abs(self.current_velocity) < 1:
             self.state = 2
             self.time_stamp = time.time()
         elif self.state == 2 and time.time() > self.time_stamp + self.rehab.exercise_para_dict['hold_time']:
@@ -106,8 +113,7 @@ class Passive_rehab:
         distance = abs(self.desired_position_end - self.desired_position_start)
         # constant_vel_time = distance/self.rehab.dThetaMax - self.rehab.acc_time
 
-        self.dTheta = self.rehab.exercise_para_dict['desired_velocity']
-        self.ddTheta = self.rehab.exercise_para_dict['desired_acceleration']
+        
         
         constant_vel_time = distance/self.dTheta - self.dTheta/self.ddTheta
         acc_vel_time = self.dTheta/self.ddTheta
@@ -178,7 +184,7 @@ class Passive_rehab:
                 x_rise = (v_max / (2 * t_rise)) * t_rise**2  # 상승 구간 끝 위치
                 x_high = x_rise + v_max * t_high  # 등속 구간 끝 위치
                 t_fall_start = t_rise + t_high
-                des_dis =  x_high + (v_max * (t - t_fall_start)) - (v_max / (2 * t_fall)) * (t - t_fall_start)**2
+                des_dis = x_high + (v_max * (t - t_fall_start)) - (v_max / (2 * t_fall)) * (t - t_fall_start)**2
             else:
                 des_dis = distance
         else:

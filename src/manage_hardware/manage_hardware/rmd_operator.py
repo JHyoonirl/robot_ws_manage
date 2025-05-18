@@ -86,10 +86,10 @@ class Motor(Node):
             Float64MultiArray, 'Motor_hydrodynamic_control_info', self.motor_hydrodynamic_callback, self.qos_profile
         )
         self.motor_assistance_control_subscriber = self.create_subscription(
-            Float64MultiArray, 'Motor_assistance_control_info', self.motor_assistance_callback, self.qos_profile
+            Float64MultiArray, 'Assistance_parameter', self.motor_assistance_callback, self.qos_profile
         )
         self.motor_resistance_control_subscriber = self.create_subscription(
-            Float64MultiArray, 'Motor_resistance_control_info', self.motor_resistance_callback, self.qos_profile
+            Float64MultiArray, 'Resistance_parameter', self.motor_resistance_callback, self.qos_profile
         )
         self.const_angle_parameter_subscriber = self.create_subscription(
             Float64MultiArray, 'Const_angle_parameter', self.const_angle_parameter_callback, self.qos_profile
@@ -99,7 +99,7 @@ class Motor(Node):
         ##############
         # exercise trajectory
         ##############
-        self.desired_trajectory_position = 0.0
+        self.desired_trajectory_position_deg = 0.0
         '''
         deg
         '''
@@ -107,6 +107,12 @@ class Motor(Node):
         self.desired_trajectory_velocity = 0.0
         '''
         deg/s
+        '''
+        self.desired_trajectory_state = 0
+        '''
+        0: stop
+        1: start
+        2: hold
         '''
 
         ##############
@@ -131,12 +137,7 @@ class Motor(Node):
         '''
         desired exercise knee angle [deg/s]
         '''
-        self.exercise_state = 0
-        '''
-        0: stop
-        1: start
-        2: hold
-        '''
+        
         self.repeatation_number = 0
         self.hold_time = 0 
         self.power_enabled = 0
@@ -192,11 +193,15 @@ class Motor(Node):
         self.hydrodynamic_test_hold_time = 0.0
         
         
-        # resistance parameter
-        self.resistance_gains = PIDGains() # resistance gains
-
         # assistance parameter
-        self.assistance_gains = PIDGains() # assistance gains
+        self.assistance_muscle_gains = PIDGains() # assistance gains
+        self.assistance_muscle_err_state = ControlError() # assistance error state
+
+        # resistance parameter
+        self.resistance_muscle_gains = PIDGains() # resistance gains
+        self.resistance_muscle_err_state = ControlError() # assistance error state
+
+        
 
 
         # const angle parameter
@@ -257,9 +262,11 @@ class Motor(Node):
             if self.muscle_passive_component_switch == 1:
                 torque = self.muscle.M_passive(self.motor_knee_angle, self.motor_velocity)
                 self.get_logger().info(f"muscle passive torque: {torque}")
-                torque_LSB = self.muscle.torque_to_LSB(torque)
-                self.get_logger().info(f"muscle passive torque LSB: {torque_LSB}")
-                self.RMD.torque_closed_loop(int(torque_LSB))
+                muslce_torque_LSB = self.muscle.torque_to_LSB(torque)
+                self.get_logger().info(f"muscle passive torque LSB: {muslce_torque_LSB}")
+            else:
+                muslce_torque_LSB = 0
+                # self.RMD.torque_closed_loop(int(torque_LSB))
 
             
             if self.control_mode == 1: # 등각속도 운동
@@ -267,16 +274,23 @@ class Motor(Node):
             elif self.control_mode == 2: # sine
                 self.motor_sine()
             elif self.control_mode == 3: # passive exercise
-                pass
-                # self.motor_passive()
-            elif self.control_mode == 4: # resistance exercise
-                pass
-                # self.motor_resistance()
-            elif self.control_mode == 5: # assistance exercise
-                pass
-                # self.motor_assistance()
+                total_LSB = muslce_torque_LSB
+                self.get_logger().info(f"passive total : {total_LSB}")
+                self.RMD.torque_closed_loop(int(total_LSB))
+            elif self.control_mode == 4: # assistance exercise
+                assistance_LSB = self.motor_assistance()
+                total_LSB = muslce_torque_LSB + assistance_LSB
+                self.get_logger().info(f"total_LSB: {total_LSB}")
+                self.RMD.torque_closed_loop(int(total_LSB))
+
+            elif self.control_mode == 5: # resistance exercise
+                resistance_LSB = self.motor_resistance()
+                total_LSB = muslce_torque_LSB + resistance_LSB
+                self.get_logger().info(f"total_LSB: {total_LSB}")
+                self.RMD.torque_closed_loop(int(total_LSB))
             elif self.control_mode == 6: # angle move
                 self.motor_angle_move()
+            
             self.past_time = time.time()
             self.power_enabled_prev = self.power_enabled
             return self.power_enabled
@@ -447,6 +461,58 @@ class Motor(Node):
         desired_vel = amplitude * omega * math.cos(omega*t_sine)
         return desired_vel, 1
     
+    def motor_assistance(self):
+        self.dt = time.time() - self.past_time
+        self.desired_trajectory_position_rad = math.radians(self.desired_trajectory_position_deg)
+        self.motor_knee_angle_rad = math.radians(self.motor_knee_angle)
+
+        self.pos_error = self.desired_trajectory_position_rad - self.motor_knee_angle_rad
+
+        # PID 계산
+        proportional = self.assistance_muscle_gains.proportional * self.pos_error
+        self.assistance_muscle_err_state.errorintegral += self.pos_error * self.dt
+        integral = self.assistance_muscle_gains.integral * self.assistance_muscle_err_state.errorintegral
+        derivative = self.assistance_muscle_gains.derivative * (self.pos_error - self.assistance_muscle_err_state.errorprev) / self.dt
+        self.assistance_muscle_err_state.errorprev = self.pos_error
+
+        output_LSB = proportional + integral + derivative
+
+        if self.control_active == 0:
+            self.pos_error = 0
+            self.assistance_muscle_err_state.errorintegral = 0.0
+            self.assistance_muscle_err_state.errorprev = 0
+            self.assistance_muscle_err_state.errorderivative = 0.0
+            output_LSB = 0
+
+        return output_LSB
+    
+    def motor_resistance(self):
+        self.dt = time.time() - self.past_time
+        self.desired_trajectory_position_rad = math.radians(self.desired_trajectory_position_deg)
+        self.motor_knee_angle_rad = math.radians(self.motor_knee_angle)
+
+        self.pos_error = self.desired_trajectory_position_rad - self.motor_knee_angle_rad
+
+        # PID 계산
+        proportional = self.resistance_muscle_gains.proportional * self.pos_error
+        self.resistance_muscle_err_state.errorintegral += self.pos_error * self.dt
+        integral = self.resistance_muscle_gains.integral * self.resistance_muscle_err_state.errorintegral
+        derivative = self.resistance_muscle_gains.derivative * (self.pos_error - self.resistance_muscle_err_state.errorprev) / self.dt
+        self.resistance_muscle_err_state.errorprev = self.pos_error
+
+        output_LSB = proportional + integral + derivative
+
+        if self.control_active == 0:
+            self.pos_error = 0
+            self.resistance_muscle_err_state.errorintegral = 0.0
+            self.resistance_muscle_err_state.errorprev = 0.0
+            self.resistance_muscle_err_state.errorderivative = 0.0
+            output_LSB = 0
+            
+        return output_LSB
+
+        
+    
     def motor_angle_move(self):
         self.dt = time.time() - self.past_time
 
@@ -460,6 +526,7 @@ class Motor(Node):
         self.const_angle_err_state.errorprev = self.pos_error
 
         if self.control_active == 0:
+            self.pos_error = 0
             self.const_angle_err_state.errorintegral = 0.0
             self.const_angle_err_state.errorprev = 0.0
             self.const_angle_err_state.errorderivative = 0.0
@@ -476,13 +543,13 @@ class Motor(Node):
     
     ############### motor ROS2 callback function ###############
     def desired_trajectory_position_callback(self, msg:Float64):
-        self.desired_trajectory_position = msg.data
+        self.desired_trajectory_position_deg = msg.data
 
     def desired_trajectory_velocity_callback(self, msg:Float64):
         self.desired_trajectory_velocity = msg.data
 
     def trajectory_state_callback(self, msg:Float64):
-        self.exercise_state = msg.data
+        self.desired_trajectory_state = msg.data
 
     def exercise_info_callback(self, msg):
         exercise_info = msg.data
@@ -540,18 +607,18 @@ class Motor(Node):
     def motor_assistance_callback(self, msg):
         try:
             # self.get_logger().info(f"Received assistance control info: {msg.data}")
-            self.assistance_gains.proportional = msg.data[0]
-            self.assistance_gains.integral = msg.data[1]
-            self.assistance_gains.derivative = msg.data[2]
+            self.assistance_muscle_gains.proportional = msg.data[4]
+            self.assistance_muscle_gains.integral = msg.data[5]
+            self.assistance_muscle_gains.derivative = msg.data[6]
         except Exception as e:
             print(f'Error assistance: {e}')
 
     def motor_resistance_callback(self, msg):
         try:
             # self.get_logger().info(f"Received resistance control info: {msg.data}")
-            self.resistance_gains.proportional = msg.data[0]
-            self.resistance_gains.integral = msg.data[1]
-            self.resistance_gains.derivative = msg.data[2]
+            self.resistance_muscle_gains.proportional = msg.data[1]
+            self.resistance_muscle_gains.integral = msg.data[2]
+            self.resistance_muscle_gains.derivative = msg.data[3]
         except Exception as e:
             print(f'Error resistance: {e}')
 
