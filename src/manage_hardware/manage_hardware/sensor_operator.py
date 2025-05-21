@@ -141,7 +141,7 @@ class SensorApp(QMainWindow):
         
         self.force_data = [[], [], []]  # 각 축의 힘 데이터를 저장하는 리스트
         self.torque_data = [[], [], []]  # 각 축의 토크 데이터를 저장하는 리스트
-        self.move(1400, 0)
+        self.move(1400, 1920)
         self.show()
 
     def init_ui(self):
@@ -199,7 +199,7 @@ class Ros2Thread(Thread):
 
 def main(args=None):
     def signal_handler(sig, frame):
-        print("Shutting down...")
+        # print("Shutting down...")
         app.quit()  # QApplication을 종료합니다.
         sys.exit(0)  # 강제로 종료합니다.
 

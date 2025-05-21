@@ -23,13 +23,13 @@ class FTSensor:
         initial_commands = [
             [0x11, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],  # Bias
             [0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],  # Baud rate
-            [0x08, 0x01, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00],  # Filter
+            [0x08, 0x01, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00],  # Filter
             [0x0F, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]   # Output rate
         ]
         for command in initial_commands:
             self.send_data_without_read(command)
             time.sleep(0.2)
-        print('FT sensor 초기화 성공')
+        # print('FT sensor 초기화 성공')
         return True
 
     def ft_sensor_once_data(self):
@@ -37,7 +37,7 @@ class FTSensor:
         try:
             self.send_data_without_read(cmd)
             time.sleep(0.2)
-            print('FT sensor start 성공')
+            # print('FT sensor start 성공')
             return True
         except Exception as e:
             print('FT sensor start 실패:', e)
@@ -48,7 +48,7 @@ class FTSensor:
         try:
             self.send_data_without_read(cmd)
             time.sleep(0.2)
-            print('FT sensor start 성공')
+            # print('FT sensor start 성공')
             return True
         except Exception as e:
             print('FT sensor start 실패:', e)
@@ -66,7 +66,7 @@ class FTSensor:
                     # print(self.decoded_force, self.decoded_torque)
                     return self.decoded_force, self.decoded_torque
         else:
-            print('No')
+            # print('No')
             return [False, False, False], [False, False, False]    
         
     def ft_sensor_stop_data(self):
@@ -74,7 +74,7 @@ class FTSensor:
         try:
             self.send_data_without_read(cmd)
             time.sleep(0.2)
-            print('FT sensor Stop 성공')
+            # print('FT sensor Stop 성공')
             return True
         except Exception as e:
             print('FT sensor Stop 실패:', e)
@@ -85,7 +85,7 @@ class FTSensor:
         try:
             self.send_data_without_read(cmd)
             time.sleep(0.2)
-            print('FT sensor bias 성공')
+            # print('FT sensor bias 성공')
             return True
         except Exception as e:
             print('FT sensor bias 실패:', e)

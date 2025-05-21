@@ -24,6 +24,8 @@ class Muscle:
         False: Only for involuntary / True: Control with voluntary
         '''
 
+        self.LSB_torque_constant = 60
+
 
     def M_stiffness(self, angle):
         '''
@@ -33,7 +35,7 @@ class Muscle:
         '''
         rad_angle = np.deg2rad(angle)
         if angle >= -5 and angle  < 55:
-            torque = 10*np.exp(-3.2*rad_angle)
+            torque = 11*np.exp(-3.2*rad_angle)
         elif angle >= 55 and angle < 95:
             torque = -2.48*rad_angle + 2.84
         elif angle >= 95 and angle < 155:
@@ -89,6 +91,7 @@ class Muscle:
         LSB torque constant : 312.5 LSB/Nm
         torque : Unit[Nm]
         '''
-        LSB_torque_constant = 85
-        LSB_input = LSB_torque_constant * torque
+
+        LSB_input = self.LSB_torque_constant * torque
+
         return int(LSB_input)

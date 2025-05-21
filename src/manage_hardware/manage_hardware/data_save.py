@@ -23,12 +23,18 @@ class DataSaver(Node):
         # self.qos_profile = QoSProfile(history = QoSHistoryPolicy.KEEP_LAST, depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
         self.qos_profile = QoSProfile(depth=10)
         self.qos_profile_ = QoSProfile(depth=100)
-        self.thruster_signal = 50.0
-        self.thruster_signal_timestamp = 0.0
+
+        
+        self.thruster_moment_timestamp = 0.0
 
         self.force_x = self.force_y = self.force_z = 0.0
         self.torque_x = self.torque_y = self.torque_z = 0.0
+
+        self.thruster_moment, self.added_mass, self.drag = 0.0, 0.0, 0.0
+
+        self.desired_position, self.knee_angle, self.imu_velocity, self.imu_acceleration = 0.0, 0.0, 0.0, 0.0
         
+        self.trajectory_state = self.desired_velocity = 0
         # self.prev_pwm = None
         # self.prev_force = (None, None, None)
         # self.prev_torque = (None, None, None)
@@ -44,10 +50,11 @@ class DataSaver(Node):
         self.sensor_status = True
         self.motor_status = True
 
-        self.data_sheet_thruster_signal = deque()
+        self.data_sheet_thruster = deque()
         self.data_sheet_force = deque()
         self.data_sheet_torque = deque()
         self.data_sheet_motor = deque()
+        self.data_sheet_trajectory = deque()
 
         self.force_ = ()
         self.torque_ = ()
@@ -81,6 +88,62 @@ class DataSaver(Node):
             'Motor_info',
             self.motor_subscriber,
             self.qos_profile_)
+        
+        self.thruster_sub = self.create_subscription(
+            Float64,
+            'thruster_moment',
+            self.thruster_subscriber,
+            self.qos_profile)
+        
+        self.added_mass_sub = self.create_subscription(
+            Float64,
+            'added_mass',
+            self.added_mass_subscriber,
+            self.qos_profile)
+        
+        self.drag_sub = self.create_subscription(
+            Float64,
+            'drag',
+            self.drag_subscriber,
+            self.qos_profile)
+        
+        self.exercise_desired_trajectory_position_subscriber = self.create_subscription(
+            Float64,
+            'desired_trajectory_position',
+            self.exercise_desired_trajectory_position_callback,
+            self.qos_profile)
+        
+        self.exercise_desired_trajectory_velocity_subscriber = self.create_subscription(
+            Float64,
+            'desired_trajectory_velocity',
+            self.exercise_desired_trajectory_velocity_callback,
+            self.qos_profile)
+        
+        self.exercise_trajectory_state_subscriber = self.create_subscription(
+            Float64,
+            'trajectory_state',
+            self.exercise_desired_trajectory_state_callback,
+            self.qos_profile)
+        
+        self.imu_knee_angle_sub = self.create_subscription(
+            Vector3,
+            'imu_data_shank',
+            self.imu_knee_angle_subscriber,
+            self.qos_profile)
+        
+        self.imu_velocity_subscriber = self.create_subscription(
+            Float64,
+            'imu_data_velocity',
+            self.imu_velocity_callback,
+            self.qos_profile)
+        
+        self.imu_acceleration_subscriber = self.create_subscription(
+            Float64,
+            'imu_data_acceleration',
+            self.imu_acceleration_callback,
+            self.qos_profile)
+
+
 
         # Updated motor_info structure
         self.voltage = 0.0
@@ -88,31 +151,53 @@ class DataSaver(Node):
         self.motor_velocity = 0.0
         self.motor_knee_angle = 0.0
 
-        # Lock for thread safety when accessing node data
+
         self.data_lock = Lock()
-        # self.timer_1 = self.create_timer(0.005, self.data_saver)
-        # self.timer_2 = self.create_timer(0.005, self.thruster_pub) # 실험을 위해 주석 처리
 
-    
-    ###### 이제 분석 완료하여 주석 처리, 삭제하지는 말 것 #####
-    # def thruster_pub(self):
-    #     msg = Float64()
 
-    #     msg.data = self.thruster_signal
-    #     self.Thruster_publisher.publish(msg)
-
-    def thruster_subscriber(self, msg):
+    def thruster_subscriber(self, msg: Float64):
         # with self.data_lock:
-        self.thruster_signal = msg.data
-        self.thruster_signal_timestamp = time.time()
+        self.thruster_moment = msg.data
+        self.thruster_moment_timestamp = time.time()
         if self.saving_status and self.thruster_status == True:
-            dt_object = datetime.datetime.fromtimestamp(self.thruster_signal_timestamp)
+            dt_object = datetime.datetime.fromtimestamp(self.thruster_moment_timestamp)
             formatted_time = dt_object.strftime('%H:%M:%S.%f')[:-3]  # .%f는 마이크로세컨드까지 포함하므로, 마지막 3자리를 잘라 밀리세컨드로 사용
 
-            data_entry = [formatted_time, self.thruster_signal]
-            self.data_sheet_thruster_signal.append(data_entry)
-            # self.get_logger().info("{0}".format(data_entry))
-            # self.last_pwm_save_time = time.time()
+            data_entry = [formatted_time, self.thruster_moment, self.added_mass, self.drag]
+            self.data_sheet_thruster.append(data_entry)
+
+    def added_mass_subscriber(self, msg: Float64):
+        self.added_mass = msg.data
+
+    def drag_subscriber(self, msg: Float64):
+        self.drag = msg.data
+        
+    def imu_knee_angle_subscriber(self, msg: Vector3):
+        # with self.data_lock:
+        self.knee_angle = msg.x
+        self.knee_angle_timestamp = time.time()
+        if self.saving_status and self.sensor_status == True:
+            dt_object = datetime.datetime.fromtimestamp(self.knee_angle_timestamp)
+            formatted_time = dt_object.strftime('%H:%M:%S.%f')[:-3]
+            
+            data_entry = [formatted_time, self.desired_position, self.desired_velocity, self.trajectory_state, self.knee_angle, self.imu_velocity, self.imu_acceleration]
+            self.data_sheet_trajectory.append(data_entry)
+
+
+    def imu_velocity_callback(self, msg: Float64):
+        self.imu_velocity = msg.data
+
+    def imu_acceleration_callback(self, msg: Float64):
+        self.imu_acceleration = msg.data
+        
+    def exercise_desired_trajectory_position_callback(self, msg: Float64):
+        self.desired_position = msg.data
+
+    def exercise_desired_trajectory_velocity_callback(self, msg: Float64):
+        self.desired_velocity = msg.data
+
+    def exercise_desired_trajectory_state_callback(self, msg: Float64):
+        self.trajectory_state = msg.data
 
     def force_subscriber(self, msg):
         # with self.data_lock:
@@ -124,8 +209,7 @@ class DataSaver(Node):
             
             data_entry = [formatted_time, self.force_x, self.force_y, self.force_z]
             self.data_sheet_force.append(data_entry)
-            # self.get_logger().info("{0}".format(data_entry))
-            # self.last_force_save_time = time.time()
+
                 
 
     def torque_subscriber(self, msg):
@@ -141,7 +225,7 @@ class DataSaver(Node):
             # self.get_logger().info("{0}".format(data_entry))
             # self.last_force_save_time = time.time()
 
-    def motor_subscriber(self, msg):
+    def motor_subscriber(self, msg: Float64MultiArray):
         _, _, self.voltage, self.torque_current, self.motor_velocity, _, self.motor_knee_angle = msg.data
         self.motor_timestamp = time.time()
         if self.saving_status and self.motor_status == True:
@@ -164,7 +248,7 @@ class DataSaveApp(QMainWindow):
         self.thruster_signal = 0.0
         self.ui = uic.loadUi('UI/data_save.ui', self)
         self.init_ui()
-        self.move(850,0)
+        self.move(850,1920)
         
         self.show()
 
@@ -214,7 +298,7 @@ class DataSaveApp(QMainWindow):
     def update_data(self):
         # with self.node.data_lock:
         if self.node.thruster_status == True:
-            self.Thruster_data_text.setPlainText(f'{self.node.thruster_signal:.2f}')
+            self.Thruster_data_text.setPlainText(f'{self.node.thruster_moment:.2f}')
         else:
             self.Thruster_data_text.clear()
 
@@ -256,7 +340,11 @@ class DataSaveApp(QMainWindow):
 
     def data_reset_fcn(self):
         # self.saving = True
-        self.node.data_sheet = deque()
+        self.node.data_sheet_thruster.clear()
+        self.node.data_sheet_trajectory.clear()
+        self.node.data_sheet_force.clear()
+        self.node.data_sheet_torque.clear()
+        self.node.data_sheet_motor.clear()
         self.Save_status_text.setText("data_reset")
     
     def data_load_fcn(self):
@@ -281,9 +369,12 @@ class DataSaveApp(QMainWindow):
                 full_filename = f"{self.file_name}.xlsx"
                 with pd.ExcelWriter(full_filename, engine='openpyxl') as writer:
                     # 각 데이터 저장 여부에 따라 DataFrame 생성 및 시트로 저장
-                    if self.node.thruster_status and self.node.data_sheet_thruster_signal:
-                        df_thruster = pd.DataFrame(self.node.data_sheet_thruster_signal, columns=['Time', 'Thruster_signal'])
+                    if self.node.thruster_status and self.node.data_sheet_thruster:
+                        df_thruster = pd.DataFrame(self.node.data_sheet_thruster, columns=['Time', 'thruster_moment', 'added_mass', 'drag'])
                         df_thruster.to_excel(writer, sheet_name='Thruster', index=False)
+                    if self.node.data_sheet_trajectory:
+                        df_trajectory = pd.DataFrame(self.node.data_sheet_trajectory, columns=['Time', 'desired_position', 'desired_velocity', 'state','angle', 'velocity', 'acceleration'])
+                        df_trajectory.to_excel(writer, sheet_name='Trajectory', index=False)
                     if self.node.sensor_status and self.node.data_sheet_force:
                         df_force = pd.DataFrame(self.node.data_sheet_force, columns=['Time', 'Force_X', 'Force_Y', 'Force_Z'])
                         df_force.to_excel(writer, sheet_name='Force', index=False)
@@ -305,7 +396,8 @@ class DataSaveApp(QMainWindow):
             self.Save_status_text.setText("Data save failed")
 
         # 데이터 시트 초기화
-        self.node.data_sheet_thruster_signal.clear()
+        self.node.data_sheet_thruster.clear()
+        self.node.data_sheet_trajectory.clear()
         self.node.data_sheet_force.clear()
         self.node.data_sheet_torque.clear()
         self.node.data_sheet_motor.clear()

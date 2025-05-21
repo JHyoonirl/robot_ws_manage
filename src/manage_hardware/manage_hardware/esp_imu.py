@@ -96,13 +96,13 @@ class ESP32Board(Node):
         '''
         deg
         '''
-        imu_msg.x = ( - data['r'] ) / 16.00 + 93.3
+        imu_msg.x = ( - data['r'] ) / 16.00 + 90
         # self.get_logger().info(f"IMU data: {imu_msg.x}")s
         imu_msg.y = data['p'] / 16.00
         imu_msg.z = data['y'] / 16.00
 
         # Apply smoothing to imu_msg using a low-pass filter
-        alpha = 0.5  # Low-pass filter coefficient (adjustable for smoothing level)
+        alpha = 1  # Low-pass filter coefficient (adjustable for smoothing level)
 
         if not hasattr(self, 'smoothed_imu_msg'):
             self.smoothed_imu_msg = Vector3()
@@ -122,15 +122,24 @@ class ESP32Board(Node):
         now = time.time()
         dt = now - self.previous_time
         acc_msg = Float64()
-        vel_msg = Float64()
-        alpha = 0.3  # Low-pass filter coefficient (adjustable for smoothing level)
+        alpha = 0.1  # Low-pass filter coefficient (adjustable for smoothing level)
         if dt > 0:
             acc_raw = (angular_velocity - self.previous_velocity) / dt
             self.smoothed_acceleration = (1 - alpha) * self.smoothed_acceleration + alpha * acc_raw
             acc_msg.data = self.smoothed_acceleration
             self.imu_acceleration.publish(acc_msg)
 
-        vel_msg.data = angular_velocity
+        # Apply low-pass filter to velocity
+        alpha_velocity = 0.5  # Low-pass filter coefficient for velocity
+
+        if not hasattr(self, 'smoothed_velocity'):
+            self.smoothed_velocity = 0.0
+
+        self.smoothed_velocity = alpha_velocity * angular_velocity + (1 - alpha_velocity) * self.smoothed_velocity
+
+        # Publish the smoothed velocity
+        vel_msg = Float64()
+        vel_msg.data = self.smoothed_velocity
         self.imu_velocity.publish(vel_msg)
 
         self.prev_velocity = angular_velocity

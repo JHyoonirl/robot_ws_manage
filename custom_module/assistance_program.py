@@ -143,14 +143,17 @@ class Assistance_rehab:
         
         if self.signal == 1:
             if self.repeatation_memory % 2 == 0:
-                self.desired_position_start = self.current_position
+                self.desired_position_start = self.rehab.exercise_para_dict['rom_upper']
                 self.desired_position_end = self.rehab.exercise_para_dict['rom_lower']
+                if self.repeatation_memory == 0:
+                    self.desired_position_start = self.current_position
+                    self.desired_position_end = self.rehab.exercise_para_dict['rom_lower']
             else:
-                self.desired_position_start = self.current_position
+                self.desired_position_start = self.rehab.exercise_para_dict['rom_lower']
                 self.desired_position_end = self.rehab.exercise_para_dict['rom_upper']
 
             # desired position을 설정하고 나서 signal 다시 0으로 초기화
-            self.signal = 0      
+            self.signal = 0
 
     
     def desired_position_and_velocity_trajectory_generator(self):

@@ -75,7 +75,7 @@ class Passive_rehab:
             self.time_stamp = time.time()
             self.desired_angle = self.current_position
             
-        elif self.state == 1 and abs(self.desired_position_end - self.current_position) < 2 and abs(self.current_velocity) < 1:
+        elif self.state == 1 and abs(self.desired_position_end - self.current_position) < 5 and abs(self.current_velocity) < 1:
             self.state = 2
             self.time_stamp = time.time()
         elif self.state == 2 and time.time() > self.time_stamp + self.rehab.exercise_para_dict['hold_time']:
@@ -93,10 +93,13 @@ class Passive_rehab:
         
         if self.signal == 1:
             if self.repeatation_memory % 2 == 0:
-                self.desired_position_start = self.current_position
+                self.desired_position_start = self.rehab.exercise_para_dict['rom_upper']
                 self.desired_position_end = self.rehab.exercise_para_dict['rom_lower']
+                if self.repeatation_memory == 0:
+                    self.desired_position_start = self.current_position
+                    self.desired_position_end = self.rehab.exercise_para_dict['rom_lower']
             else:
-                self.desired_position_start = self.current_position
+                self.desired_position_start = self.rehab.exercise_para_dict['rom_lower']
                 self.desired_position_end = self.rehab.exercise_para_dict['rom_upper']
 
             # desired position을 설정하고 나서 signal 다시 0으로 초기화

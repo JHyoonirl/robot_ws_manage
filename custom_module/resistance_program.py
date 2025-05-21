@@ -1,62 +1,13 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 import time
+import numpy as np
 
 if TYPE_CHECKING:
     from src.manage_hardware.manage_hardware.rehab_operator import Rehab_program
 
 
 class Resistance_rehab:
-    def __init__(self, rehab:Rehab_program):
-        
-        self.rehab = rehab
-        self.time_stamp = 0
-
-        self.desired_position_end = 0
-        self.desired_position_start = 0
-        self.dtheta_desired_current = 0
-
-        self.desired_angle = 0
-        self.current_position = self.rehab.imu_knee_angle_deg
-        '''
-        unit: [deg]
-        '''
-        '''
-        나중에 센서값을 변경해야 함!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        
-        '''
-        self.current_velocity = 0
-
-        self.repeatation_memory = 0 
-        '''
-        짝수: Extension
-        홀수: Flexion
-        '''
-
-        self.signal = 0
-        '''
-        signal: 0(현재 state 유지), 1(Generate desired trajectory), 2(Hold position)
-        '''
-        
-        self.state = 0
-        '''
-        state: 0(최초 움직임), 1(Desired trajectory를 따라 움직임), 2(Holding), 3(운동 종료)
-        '''
-
-    def Passive_exercise(self):
-        '''
-        Passive mode 진행 프로토콜을 Main loop로 실행되는 부분
-        '''
-        self.current_position = self.rehab.imu_knee_angle_deg
-        
-        self.control_generator()
-        self.desired_position_generator()
-        self.desired_velocity_profile_generator()
-        self.desired_position_trajectory_generator()
-        # self.current_position = self.desired_angle
-        # print(self.desired_position_start, self.desired_position_end)
-        return self.desired_angle, self.dtheta_desired_current
-
     def __init__(self, rehab:Rehab_program):
         
         self.rehab = rehab
@@ -87,6 +38,11 @@ class Resistance_rehab:
         짝수: Extension
         홀수: Flexion
         '''
+        self.sign = 0
+        '''
+        +: flexion
+        -: extension
+        '''
 
         self.signal = 0
         '''
@@ -95,8 +51,37 @@ class Resistance_rehab:
         
         self.state = 0
         '''
-        state: 0(최초 움직임), 1(Desired trajectory를 따라 움직임), 2(Holding), 3(운동 종료)
+        state: 0(최초 움직임), 1(Desired trajectory를 따라 움직임), 2(Holding), 3(resistance_moment 변환), 4(운동 종료)
         '''
+
+        self.moment_state = 0
+        '''
+        0: 아직 새로운 선도 생성 x
+        1: 새로운 선도 생성 o
+        '''
+        self.moment_init()
+    def moment_init(self):
+        
+        #### resistance parameter
+        self.resistance_moment = self.rehab.resistance_para_dict['resistance_moment']
+        self.resistance_moment_memory = 0.0
+        self.resistance_moment_variation = 2
+        self.desired_resistance_moment = 0.0
+        self.desired_resistance_moment_prev = 0.0
+
+    def Passive_exercise(self):
+        '''
+        Passive mode 진행 프로토콜을 Main loop로 실행되는 부분
+        '''
+        self.current_position = self.rehab.imu_knee_angle_deg
+        
+        self.control_generator()
+        self.desired_position_generator()
+        self.desired_velocity_profile_generator()
+        self.desired_position_trajectory_generator()
+        # self.current_position = self.desired_angle
+        # print(self.desired_position_start, self.desired_position_end)
+        return self.desired_angle, self.dtheta_desired_current
 
     def resistance_exercise(self):
         '''
@@ -128,11 +113,16 @@ class Resistance_rehab:
         elif self.state == 1 and abs(self.desired_position_end - self.current_position) < 2 and abs(self.current_velocity) < 1:
             self.state = 2
             self.time_stamp = time.time()
-        elif self.state == 2 and time.time() > self.time_stamp + self.rehab.exercise_para_dict['hold_time']:
-            self.state = 1
+        elif self.state == 2 and time.time() > self.time_stamp + self.rehab.exercise_para_dict['hold_time'] :
+            # if abs(self.resistance_moment_memory - self.desired_resistance_moment) < 0.1:
+            self.state = 3
+            
+            self.repeatation_memory += 1
+        elif self.state == 3 and self.moment_state == 1:
             self.signal = 1
             self.time_stamp = time.time()
-            self.repeatation_memory += 1
+            self.state = 1
+
         if self.repeatation_memory >= self.rehab.exercise_para_dict['repeatation_number']:
             self.state = 3
             self.signal = 0
@@ -143,14 +133,17 @@ class Resistance_rehab:
         
         if self.signal == 1:
             if self.repeatation_memory % 2 == 0:
-                self.desired_position_start = self.current_position
+                self.desired_position_start = self.rehab.exercise_para_dict['rom_upper']
                 self.desired_position_end = self.rehab.exercise_para_dict['rom_lower']
+                if self.repeatation_memory == 0:
+                    self.desired_position_start = self.current_position
+                    self.desired_position_end = self.rehab.exercise_para_dict['rom_lower']
             else:
-                self.desired_position_start = self.current_position
+                self.desired_position_start = self.rehab.exercise_para_dict['rom_lower']
                 self.desired_position_end = self.rehab.exercise_para_dict['rom_upper']
 
             # desired position을 설정하고 나서 signal 다시 0으로 초기화
-            self.signal = 0      
+            self.signal = 0 
 
     
     def desired_position_and_velocity_trajectory_generator(self):
@@ -172,9 +165,9 @@ class Resistance_rehab:
         t_total = t_high + t_rise*2
 
         if self.desired_position_end - self.desired_position_start > 0: # 전진
-            sign =  1
+            self.sign =  1
         else:
-            sign =  - 1
+            self.sign =  - 1
 
         t = time.time() - self.time_stamp
         if self.state == 1:
@@ -192,17 +185,39 @@ class Resistance_rehab:
             else:
                 des_dis = distance
 
-            if t <= t_rise:
-                self.dtheta_desired_current = 0
-            else:
-                if sign > 0:
-                    self.dtheta_desired_current = (v_max - 3)
-                else:
-                    self.dtheta_desired_current = - (v_max - 3)
+            self.dtheta_desired_current = self.sign * self.dTheta
         else:
             des_dis = distance
-        self.desired_angle = self.desired_position_start + sign * des_dis
+        self.desired_angle = self.desired_position_start + self.sign * des_dis
 
+    def resistance_moment_generator_fcn(self):
+        '''
+        +: flexion
+        -: extension
+        '''
+        self.dt = time.time() - self.rehab.past_time
+        if self.moment_state == 1:
+            self.moment_state = 0
+        
+        if self.repeatation_memory % 2 == 0:
+            self.desired_resistance_moment = self.resistance_moment
+        else:
+            self.desired_resistance_moment =  - self.resistance_moment
+        
+        resistance_moment_variation_tmp = (self.desired_resistance_moment - self.resistance_moment_memory) / self.dt
+        if abs(resistance_moment_variation_tmp) > self.resistance_moment_variation:
+            if resistance_moment_variation_tmp > 0:
+                self.resistance_moment_memory += self.resistance_moment_variation * self.dt
+            else:
+                self.resistance_moment_memory -= self.resistance_moment_variation * self.dt
+            # self.moment_state = 0
+        else:
+            self.resistance_moment_memory = self.desired_resistance_moment
+
+        if self.state == 3 and self.resistance_moment_memory == self.desired_resistance_moment:
+            self.moment_state = 1
+        
+        return self.resistance_moment_memory
 
 def main():
     resistance_mode = Resistance_rehab()

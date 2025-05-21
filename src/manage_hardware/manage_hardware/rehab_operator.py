@@ -56,10 +56,13 @@ class Rehab_program(Node):
             Float64, 'desired_trajectory_position', self.qos_profile)
         
         self.exercise_desired_trajectory_velocity_publisher = self.create_publisher(
-            Float64, 'desired_vtrajectory_velocity', self.qos_profile)
+            Float64, 'desired_trajectory_velocity', self.qos_profile)
         
         self.exercise_trajectory_state_publisher = self.create_publisher(
             Float64, 'trajectory_state', self.qos_profile)
+        
+        self.resistance_moment_publisher = self.create_publisher(
+            Float64, 'resistance_moment', self.qos_profile)
         
         self.exercise_info_publisher = self.create_publisher(
             Float64MultiArray, 'Exercise_info', self.qos_profile)
@@ -307,6 +310,7 @@ class Rehab_program(Node):
                 self.Passive_rehab_module.current_position = self.imu_knee_angle_deg
                 self.Passive_rehab_module.control_generator()
                 self.Passive_rehab_module.desired_position_generator()
+                self.Passive_rehab_module.desired_velocity_profile_generator()
                 self.Passive_rehab_module.desired_position_trajectory_generator()
                 self.desired_trajectory_position = self.Passive_rehab_module.desired_angle
                 self.desired_trajectory_velocity = self.Passive_rehab_module.dtheta_desired_current
@@ -330,19 +334,30 @@ class Rehab_program(Node):
             
         elif self.control_mode == 5: # resistance mode
             if self.control_active == 0:
+                self.Resistance_rehab_module.moment_init()
                 self.Resistance_rehab_module.state = 0
                 self.Resistance_rehab_module.repeatation_memory = 0
                 self.desired_trajectory_position = self.Resistance_rehab_module.desired_angle
                 self.desired_trajectory_velocity = 0
                 self.desired_trajectory_state = self.Resistance_rehab_module.state
+                # self.resistance_moment = 0.0
             else:
                 self.Resistance_rehab_module.current_position = self.imu_knee_angle_deg
                 self.Resistance_rehab_module.control_generator()
                 self.Resistance_rehab_module.desired_position_generator()
                 self.Resistance_rehab_module.desired_position_and_velocity_trajectory_generator()
+                self.Resistance_rehab_module.resistance_moment_generator_fcn()
+
                 self.desired_trajectory_position = self.Resistance_rehab_module.desired_angle
                 self.desired_trajectory_velocity = self.Resistance_rehab_module.dtheta_desired_current
                 self.desired_trajectory_state = self.Resistance_rehab_module.state
+                self.resistance_moment = self.Resistance_rehab_module.resistance_moment_memory
+                if self.Resistance_rehab_module.state == 3:
+                    self.get_logger().info(f"Resistance moment: {self.resistance_moment:.2f}")
+                    self.get_logger().info(f"desired_resistance_moment: {self.Resistance_rehab_module.desired_resistance_moment:.2f}")
+                    self.get_logger().info(f"moment_state: {self.Resistance_rehab_module.moment_state:.2f}")
+                self.resistance_moment_publisher.publish(Float64(data=self.resistance_moment))
+
         else:
             pass
         self.desired_trajectory_position_pub()

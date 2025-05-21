@@ -1,6 +1,7 @@
 import sys
 import rclpy
 from std_msgs.msg import Float64, Float64MultiArray
+from geometry_msgs.msg import Vector3
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
 
@@ -66,12 +67,23 @@ class Motor(Node):
         # Publishers
         self.motor_info_publisher = self.create_publisher(Float64MultiArray, 'Motor_info', self.qos_profile)
 
+        self.passive_moment_publisher = self.create_publisher(Float64, 'Passive_moment', self.qos_profile)
+        self.active_moment_publisher = self.create_publisher(Float64, 'Active_moment', self.qos_profile)
+        
+        
         # Subscribers
+
+        self.imu_shank_subscriber = self.create_subscription(
+            Vector3, 'imu_data_shank', self.imu_shank_callback, self.qos_profile)
+        
+        self.imu_velocity = self.create_subscription(
+            Float64, 'imu_data_velocity', self.imu_shank_velocity_callback, self.qos_profile)
+
         self.exercise_desired_trajectory_position_subscriber = self.create_subscription(
             Float64, 'desired_trajectory_position', self.desired_trajectory_position_callback, self.qos_profile
         )
         self.exercise_desired_trajectory_velocity_subscriber = self.create_subscription(
-            Float64, 'desired_vtrajectory_velocity', self.desired_trajectory_velocity_callback, self.qos_profile
+            Float64, 'desired_trajectory_velocity', self.desired_trajectory_velocity_callback, self.qos_profile
         )
         self.exercise_trajectory_state_subscriber = self.create_subscription(
             Float64, 'trajectory_state', self.trajectory_state_callback, self.qos_profile)
@@ -128,8 +140,16 @@ class Motor(Node):
         self.motor_angle = 0.0     # Motor angle
         self.motor_knee_angle = 0.0 # Motor knee angle
 
+        #####
+        #imu varialbles
+        #####
+
+        self.imu_knee_angle_deg = 90
+
+
+        self.imu_knee_velocity_deg = 0
         
-        
+
         ##############
         #  exercise info subscribed information
         ##############
@@ -167,6 +187,9 @@ class Motor(Node):
         self.control_time_stamp = None # control time stamp
 
         self.muscle_passive_component_switch = 0
+
+        self.passive_moment = 0
+        self.active_moment = 0
         '''
         모터에 무릎의 passive component 추가
 
@@ -215,11 +238,13 @@ class Motor(Node):
         self.past_time = time.time()
         
         if status == True:
-            self.timer = self.create_timer(0.0075, self.ros2_callback) # 10ms 마다 motor 상태 정보 publish
+            self.timer = self.create_timer(0.0075, self.ros2_callback) # 7.5ms 마다 motor 상태 정보 publish
             print('Motor thread started')
 
     def ros2_callback(self):
         self.motor_info_pub() # motor 상태 정보 publish
+        self.passive_moment_pub() # passive moment publish
+        self.active_moment_pub() # active moment publish
         status = self.motor_control()
     
     def motor_info_pub(self):
@@ -237,11 +262,23 @@ class Motor(Node):
         motor_info.data = [self.power_enabled, self.control_active, self.voltage, self.torque_current, self.motor_velocity, self.motor_angle, self.motor_knee_angle]
         self.motor_info_publisher.publish(motor_info)
 
+    def passive_moment_pub(self):
+        passive_moment = Float64()
+        passive_moment.data = float(self.passive_moment)
+        self.passive_moment_publisher.publish(passive_moment)
+    
+    def active_moment_pub(self):
+        active_moment = Float64()
+        active_moment.data = float(self.active_moment)
+        self.active_moment_publisher.publish(active_moment)
+
+
     def motor_control(self):
         
         try:
-            motor_knee_angle = self.motor_knee_angle
-            if motor_knee_angle > self.rom_safe_upper or motor_knee_angle < self.rom_safe_lower:
+            # motor_knee_angle = self.motor_knee_angle
+            imu_knee_angle = self.imu_knee_angle_deg
+            if self.motor_knee_angle > self.rom_safe_upper or self.motor_knee_angle < self.rom_safe_lower:
                 self.power_enabled = 0
                 self.power_locked = True
                 
@@ -260,10 +297,10 @@ class Motor(Node):
             
             
             if self.muscle_passive_component_switch == 1:
-                torque = self.muscle.M_passive(self.motor_knee_angle, self.motor_velocity)
-                self.get_logger().info(f"muscle passive torque: {torque}")
-                muslce_torque_LSB = self.muscle.torque_to_LSB(torque)
-                self.get_logger().info(f"muscle passive torque LSB: {muslce_torque_LSB}")
+                self.passive_moment = self.muscle.M_passive(self.imu_knee_angle_deg, self.imu_knee_velocity_deg)
+                self.get_logger().info(f"muscle passive moment: {self.passive_moment}")
+                muslce_torque_LSB = self.muscle.torque_to_LSB(self.passive_moment)
+                # self.get_logger().info(f"muscle passive torque LSB: {muslce_torque_LSB}")
             else:
                 muslce_torque_LSB = 0
                 # self.RMD.torque_closed_loop(int(torque_LSB))
@@ -275,18 +312,20 @@ class Motor(Node):
                 self.motor_sine()
             elif self.control_mode == 3: # passive exercise
                 total_LSB = muslce_torque_LSB
-                self.get_logger().info(f"passive total : {total_LSB}")
+                # self.get_logger().info(f"passive total : {total_LSB}")
                 self.RMD.torque_closed_loop(int(total_LSB))
             elif self.control_mode == 4: # assistance exercise
                 assistance_LSB = self.motor_assistance()
                 total_LSB = muslce_torque_LSB + assistance_LSB
-                self.get_logger().info(f"total_LSB: {total_LSB}")
+                self.active_moment = assistance_LSB / self.muscle.LSB_torque_constant
+                # self.get_logger().info(f"total_LSB: {total_LSB}")
                 self.RMD.torque_closed_loop(int(total_LSB))
 
             elif self.control_mode == 5: # resistance exercise
                 resistance_LSB = self.motor_resistance()
                 total_LSB = muslce_torque_LSB + resistance_LSB
-                self.get_logger().info(f"total_LSB: {total_LSB}")
+                self.active_moment = resistance_LSB / self.muscle.LSB_torque_constant
+                # self.get_logger().info(f"total_LSB: {total_LSB}")
                 self.RMD.torque_closed_loop(int(total_LSB))
             elif self.control_mode == 6: # angle move
                 self.motor_angle_move()
@@ -464,9 +503,9 @@ class Motor(Node):
     def motor_assistance(self):
         self.dt = time.time() - self.past_time
         self.desired_trajectory_position_rad = math.radians(self.desired_trajectory_position_deg)
-        self.motor_knee_angle_rad = math.radians(self.motor_knee_angle)
+        self.imu_knee_angle_rad = math.radians(self.imu_knee_angle_deg)
 
-        self.pos_error = self.desired_trajectory_position_rad - self.motor_knee_angle_rad
+        self.pos_error = self.desired_trajectory_position_rad - self.imu_knee_angle_rad
 
         # PID 계산
         proportional = self.assistance_muscle_gains.proportional * self.pos_error
@@ -489,9 +528,9 @@ class Motor(Node):
     def motor_resistance(self):
         self.dt = time.time() - self.past_time
         self.desired_trajectory_position_rad = math.radians(self.desired_trajectory_position_deg)
-        self.motor_knee_angle_rad = math.radians(self.motor_knee_angle)
+        self.imu_knee_angle_rad = math.radians(self.imu_knee_angle_deg)
 
-        self.pos_error = self.desired_trajectory_position_rad - self.motor_knee_angle_rad
+        self.pos_error = self.desired_trajectory_position_rad - self.imu_knee_angle_rad
 
         # PID 계산
         proportional = self.resistance_muscle_gains.proportional * self.pos_error
@@ -516,7 +555,7 @@ class Motor(Node):
     def motor_angle_move(self):
         self.dt = time.time() - self.past_time
 
-        self.pos_error = self.const_angle - self.motor_knee_angle
+        self.pos_error = self.const_angle - self.imu_knee_angle_deg
 
         # PID 계산
         proportional = self.const_angle_gains.proportional * self.pos_error
@@ -542,6 +581,15 @@ class Motor(Node):
         
     
     ############### motor ROS2 callback function ###############
+
+    def imu_shank_callback(self, msg:Vector3):
+
+        self.imu_knee_angle_deg = msg.x
+
+    def imu_shank_velocity_callback(self, msg:Float64):
+        self.imu_knee_velocity_deg = msg.data
+
+
     def desired_trajectory_position_callback(self, msg:Float64):
         self.desired_trajectory_position_deg = msg.data
 
