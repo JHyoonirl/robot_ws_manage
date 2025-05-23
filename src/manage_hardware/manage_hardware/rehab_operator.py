@@ -57,6 +57,9 @@ class Rehab_program(Node):
         
         self.exercise_desired_trajectory_velocity_publisher = self.create_publisher(
             Float64, 'desired_trajectory_velocity', self.qos_profile)
+
+        self.assistance_velocity_min_publisher = self.create_publisher(
+            Float64, 'assistance_velocity_min', self.qos_profile)
         
         self.exercise_trajectory_state_publisher = self.create_publisher(
             Float64, 'trajectory_state', self.qos_profile)
@@ -130,6 +133,11 @@ class Rehab_program(Node):
         '''
         deg/s
         '''
+        self.assistance_velocity_min = 0.0
+        '''
+        min velocity for assistance mode [deg/s]
+        '''
+        
         self.desired_trajectory_state = 0.0
         '''
         0: stop
@@ -327,9 +335,11 @@ class Rehab_program(Node):
                 self.Assistance_rehab_module.current_position = self.imu_knee_angle_deg
                 self.Assistance_rehab_module.control_generator()
                 self.Assistance_rehab_module.desired_position_generator()
+                self.Assistance_rehab_module.desired_velocity_profile_generator()
                 self.Assistance_rehab_module.desired_position_and_velocity_trajectory_generator()
                 self.desired_trajectory_position = self.Assistance_rehab_module.desired_angle
                 self.desired_trajectory_velocity = self.Assistance_rehab_module.dtheta_desired_current
+                self.assistance_velocity_min = self.Assistance_rehab_module.assistance_velocity_min
                 self.desired_trajectory_state = self.Assistance_rehab_module.state
             
         elif self.control_mode == 5: # resistance mode
@@ -362,6 +372,7 @@ class Rehab_program(Node):
             pass
         self.desired_trajectory_position_pub()
         self.desired_trajectory_velocity_pub()
+        self.assistance_velocity_min_pub()
         self.exercise_trajectory_state_pub()
         self.past_time = time.time()
 
@@ -386,6 +397,11 @@ class Rehab_program(Node):
         msg = Float64()
         msg.data = float(self.desired_trajectory_velocity)
         self.exercise_desired_trajectory_velocity_publisher.publish(msg)
+
+    def assistance_velocity_min_pub(self):
+        msg = Float64()
+        msg.data = float(self.assistance_velocity_min)
+        self.assistance_velocity_min_publisher.publish(msg)
 
     def exercise_trajectory_state_pub(self):
         msg = Float64()

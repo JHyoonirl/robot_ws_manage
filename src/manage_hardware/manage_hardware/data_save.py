@@ -35,6 +35,13 @@ class DataSaver(Node):
         self.desired_position, self.knee_angle, self.imu_velocity, self.imu_acceleration = 0.0, 0.0, 0.0, 0.0
         
         self.trajectory_state = self.desired_velocity = 0
+
+        self.assistance_velocity = 0.0
+
+        self.resistance_moment = 0.0
+
+        self.passive_moment = 0.0
+        self.active_moment = 0.0
         # self.prev_pwm = None
         # self.prev_force = (None, None, None)
         # self.prev_torque = (None, None, None)
@@ -55,6 +62,7 @@ class DataSaver(Node):
         self.data_sheet_torque = deque()
         self.data_sheet_motor = deque()
         self.data_sheet_trajectory = deque()
+        self.data_sheet_muscle = deque()
 
         self.force_ = ()
         self.torque_ = ()
@@ -65,11 +73,11 @@ class DataSaver(Node):
         #### 이제 분석 완료하여 주석 처리, 삭제하지는 말 것 #####
         # self.Thruster_publisher = self.create_publisher(Float64, 'thruster_signal', self.qos_profile) # 실험을 위해 주석 처리
         
-        self.thruster_sub = self.create_subscription(
-            Float64,
-            'thruster_signal',
-            self.thruster_subscriber,
-            self.qos_profile)
+        # self.thruster_sub = self.create_subscription(
+        #     Float64,
+        #     'thruster_signal',
+        #     self.thruster_subscriber,
+        #     self.qos_profile)
         
         self.force_sub = self.create_subscription(
             Vector3,
@@ -125,6 +133,18 @@ class DataSaver(Node):
             self.exercise_desired_trajectory_state_callback,
             self.qos_profile)
         
+        self.assistance_velocity_min_subscriber = self.create_subscription(
+            Float64,
+            'assistance_velocity_min',
+            self.assistance_velocity_min_callback,
+            self.qos_profile)
+        
+        self.resistance_moment_subscriber = self.create_subscription(
+            Float64,
+            'resistance_moment',
+            self.resistance_moement_callback,
+            self.qos_profile)
+        
         self.imu_knee_angle_sub = self.create_subscription(
             Vector3,
             'imu_data_shank',
@@ -142,8 +162,18 @@ class DataSaver(Node):
             'imu_data_acceleration',
             self.imu_acceleration_callback,
             self.qos_profile)
-
-
+        
+        self.passive_muscle_subscriber = self.create_subscription(
+            Float64,
+            'Passive_moment',
+            self.passive_muscle_callback,
+            self.qos_profile)
+        
+        self.active_muscle_subscriber = self.create_subscription(
+            Float64,
+            'Active_moment',
+            self.active_muscle_callback,
+            self.qos_profile)
 
         # Updated motor_info structure
         self.voltage = 0.0
@@ -180,7 +210,7 @@ class DataSaver(Node):
             dt_object = datetime.datetime.fromtimestamp(self.knee_angle_timestamp)
             formatted_time = dt_object.strftime('%H:%M:%S.%f')[:-3]
             
-            data_entry = [formatted_time, self.desired_position, self.desired_velocity, self.trajectory_state, self.knee_angle, self.imu_velocity, self.imu_acceleration]
+            data_entry = [formatted_time, self.desired_position, self.desired_velocity, self.trajectory_state, self.knee_angle, self.imu_velocity, self.imu_acceleration, self.assistance_velocity, self.resistance_moment]
             self.data_sheet_trajectory.append(data_entry)
 
 
@@ -196,8 +226,26 @@ class DataSaver(Node):
     def exercise_desired_trajectory_velocity_callback(self, msg: Float64):
         self.desired_velocity = msg.data
 
+    def resistance_moement_callback(self, msg: Float64):
+        self.resistance_moment = msg.data
+
+    def assistance_velocity_min_callback(self, msg: Float64):
+        self.assistance_velocity = msg.data
+
     def exercise_desired_trajectory_state_callback(self, msg: Float64):
         self.trajectory_state = msg.data
+
+    def passive_muscle_callback(self, msg: Float64):
+        self.passive_moment = msg.data
+        if self.saving_status and self.sensor_status == True:
+            dt_object = datetime.datetime.fromtimestamp(self.passive_moment)
+            formatted_time = dt_object.strftime('%H:%M:%S.%f')[:-3]
+            
+            data_entry = [formatted_time, self.passive_moment, self.active_moment]
+            self.data_sheet_muscle.append(data_entry)
+
+    def active_muscle_callback(self, msg: Float64):
+        self.active_moment = msg.data
 
     def force_subscriber(self, msg):
         # with self.data_lock:
@@ -248,7 +296,7 @@ class DataSaveApp(QMainWindow):
         self.thruster_signal = 0.0
         self.ui = uic.loadUi('UI/data_save.ui', self)
         self.init_ui()
-        self.move(850,1920)
+        self.move(850,1000)
         
         self.show()
 
@@ -373,11 +421,14 @@ class DataSaveApp(QMainWindow):
                         df_thruster = pd.DataFrame(self.node.data_sheet_thruster, columns=['Time', 'thruster_moment', 'added_mass', 'drag'])
                         df_thruster.to_excel(writer, sheet_name='Thruster', index=False)
                     if self.node.data_sheet_trajectory:
-                        df_trajectory = pd.DataFrame(self.node.data_sheet_trajectory, columns=['Time', 'desired_position', 'desired_velocity', 'state','angle', 'velocity', 'acceleration'])
+                        df_trajectory = pd.DataFrame(self.node.data_sheet_trajectory, columns=['Time', 'desired_position', 'desired_velocity', 'state','angle', 'velocity', 'acceleration', 'assistance_velocity_min', 'resistance_moment'])
                         df_trajectory.to_excel(writer, sheet_name='Trajectory', index=False)
                     if self.node.sensor_status and self.node.data_sheet_force:
                         df_force = pd.DataFrame(self.node.data_sheet_force, columns=['Time', 'Force_X', 'Force_Y', 'Force_Z'])
                         df_force.to_excel(writer, sheet_name='Force', index=False)
+                    if self.node.sensor_status and self.node.data_sheet_force:
+                        df_muscle = pd.DataFrame(self.node.data_sheet_muscle, columns=['Time', 'Passive_moment', 'Active_moment'])
+                        df_muscle.to_excel(writer, sheet_name='Muscle', index=False)
                     if self.node.sensor_status and self.node.data_sheet_torque:
                         df_torque = pd.DataFrame(self.node.data_sheet_torque, columns=['Time', 'Torque_X', 'Torque_Y', 'Torque_Z'])
                         df_torque.to_excel(writer, sheet_name='Torque', index=False)
@@ -401,6 +452,7 @@ class DataSaveApp(QMainWindow):
         self.node.data_sheet_force.clear()
         self.node.data_sheet_torque.clear()
         self.node.data_sheet_motor.clear()
+        self.node.data_sheet_muscle.clear()
         
     def button_auto_saver(self):
         for i in range(0, 101, 5):

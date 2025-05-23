@@ -225,7 +225,8 @@ class Motor(Node):
         self.resistance_muscle_err_state = ControlError() # assistance error state
 
         
-
+        self.total_LSB_filtered = 0.0  # 필터 초기값
+        self.alpha = 0.5  # 필터 계수 (0 < alpha < 1)
 
         # const angle parameter
         self.const_angle = 90
@@ -312,21 +313,21 @@ class Motor(Node):
                 self.motor_sine()
             elif self.control_mode == 3: # passive exercise
                 total_LSB = muslce_torque_LSB
-                # self.get_logger().info(f"passive total : {total_LSB}")
-                self.RMD.torque_closed_loop(int(total_LSB))
+                filtered_LSB = self.low_pass_filter(total_LSB)
+                self.RMD.torque_closed_loop(int(filtered_LSB))
             elif self.control_mode == 4: # assistance exercise
                 assistance_LSB = self.motor_assistance()
                 total_LSB = muslce_torque_LSB + assistance_LSB
+                filtered_LSB = self.low_pass_filter(total_LSB)
                 self.active_moment = assistance_LSB / self.muscle.LSB_torque_constant
-                # self.get_logger().info(f"total_LSB: {total_LSB}")
-                self.RMD.torque_closed_loop(int(total_LSB))
+                self.RMD.torque_closed_loop(int(filtered_LSB))
 
             elif self.control_mode == 5: # resistance exercise
                 resistance_LSB = self.motor_resistance()
                 total_LSB = muslce_torque_LSB + resistance_LSB
+                filtered_LSB = self.low_pass_filter(total_LSB)
                 self.active_moment = resistance_LSB / self.muscle.LSB_torque_constant
-                # self.get_logger().info(f"total_LSB: {total_LSB}")
-                self.RMD.torque_closed_loop(int(total_LSB))
+                self.RMD.torque_closed_loop(int(filtered_LSB))
             elif self.control_mode == 6: # angle move
                 self.motor_angle_move()
             
@@ -339,6 +340,12 @@ class Motor(Node):
             time.sleep(0.005)
 
     ############### motor control function ###############
+
+    # 1차 Low Pass Filter 함수
+    def low_pass_filter(self, new_val):
+        self.total_LSB_filtered = self.alpha * new_val + (1 - self.alpha) * self.total_LSB_filtered
+        return self.total_LSB_filtered
+
     def motor_constant_velocity(self):
         try:
             self.dt = time.time() - self.past_time

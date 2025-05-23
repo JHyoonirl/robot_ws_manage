@@ -10,7 +10,8 @@ class Passive_rehab:
     def __init__(self, rehab:Rehab_program):
         
         self.rehab = rehab
-        self.time_stamp = 0
+        self.time_stamp_move = 0
+        self.time_stamp_hold = 0
 
         self.desired_position_end = 0
         '''
@@ -72,16 +73,16 @@ class Passive_rehab:
         if self.state == 0:
             self.signal = 1
             self.state = 1
-            self.time_stamp = time.time()
+            self.time_stamp_move = time.time()
             self.desired_angle = self.current_position
             
         elif self.state == 1 and abs(self.desired_position_end - self.current_position) < 5 and abs(self.current_velocity) < 1:
             self.state = 2
-            self.time_stamp = time.time()
-        elif self.state == 2 and time.time() > self.time_stamp + self.rehab.exercise_para_dict['hold_time']:
+            self.time_stamp_hold = time.time()
+        elif self.state == 2 and time.time() > self.time_stamp_hold + self.rehab.exercise_para_dict['hold_time']:
             self.state = 1
             self.signal = 1
-            self.time_stamp = time.time()
+            self.time_stamp_move = time.time()
             self.repeatation_memory += 1
         if self.repeatation_memory >= self.rehab.exercise_para_dict['repeatation_number']:
             self.state = 3
@@ -110,7 +111,7 @@ class Passive_rehab:
         '''
         Passive mode에서 시간에 따른 프로파일 생성
         '''
-        time_now = time.time() - self.time_stamp
+        time_now = time.time() - self.time_stamp_move
         self.dt = time.time() - self.rehab.past_time
         acc_calculated = 0
         distance = abs(self.desired_position_end - self.desired_position_start)
@@ -121,7 +122,7 @@ class Passive_rehab:
         constant_vel_time = distance/self.dTheta - self.dTheta/self.ddTheta
         acc_vel_time = self.dTheta/self.ddTheta
         # Acc = self.rehab.dThetaMax
-        if self.state == 1:
+        if self.state == 1 or self.state == 2:
                 
             if self.desired_position_end < self.desired_position_start:
                 if time_now < acc_vel_time:
@@ -176,18 +177,18 @@ class Passive_rehab:
         else:
             sign =  - 1
 
-        t = time.time() - self.time_stamp
-        if self.state == 1:
+        t = time.time() - self.time_stamp_move
+        if self.state == 1 or self.state == 2:
             if t <= t_rise:  # 가속 구간
-                des_dis = (v_max / (2 * t_rise)) * t**2
+                des_dis = (1/2)*self.ddTheta * t**2
             elif t <= t_rise + t_high:  # 등속 구간
-                x_rise = (v_max / (2 * t_rise)) * t_rise**2  # 상승 구간 끝 위치
+                x_rise = (1/2)*self.ddTheta * t_rise**2  # 상승 구간 끝 위치
                 des_dis =  x_rise + v_max * (t - t_rise)
             elif t <= t_total:  # 감속 구간
-                x_rise = (v_max / (2 * t_rise)) * t_rise**2  # 상승 구간 끝 위치
+                x_rise = (1/2)*self.ddTheta * t_rise**2  # 상승 구간 끝 위치
                 x_high = x_rise + v_max * t_high  # 등속 구간 끝 위치
                 t_fall_start = t_rise + t_high
-                des_dis = x_high + (v_max * (t - t_fall_start)) - (v_max / (2 * t_fall)) * (t - t_fall_start)**2
+                des_dis = x_high + (v_max * (t - t_fall_start)) - (1/2)*self.ddTheta * (t - t_fall_start)**2
             else:
                 des_dis = distance
         else:

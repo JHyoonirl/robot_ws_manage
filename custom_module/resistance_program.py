@@ -11,7 +11,8 @@ class Resistance_rehab:
     def __init__(self, rehab:Rehab_program):
         
         self.rehab = rehab
-        self.time_stamp = 0
+        self.time_stamp_move = 0
+        self.time_stamp_hold = 0
 
         self.desired_position_end = 0
         '''
@@ -65,7 +66,7 @@ class Resistance_rehab:
         #### resistance parameter
         self.resistance_moment = self.rehab.resistance_para_dict['resistance_moment']
         self.resistance_moment_memory = 0.0
-        self.resistance_moment_variation = 2
+        self.resistance_moment_variation = 1
         self.desired_resistance_moment = 0.0
         self.desired_resistance_moment_prev = 0.0
 
@@ -107,20 +108,20 @@ class Resistance_rehab:
         if self.state == 0:
             self.signal = 1
             self.state = 1
-            self.time_stamp = time.time()
+            self.time_stamp_move = time.time()
             self.desired_angle = self.current_position
             
-        elif self.state == 1 and abs(self.desired_position_end - self.current_position) < 2 and abs(self.current_velocity) < 1:
+        elif self.state == 1 and abs(self.desired_position_end - self.current_position) < 10 and abs(self.current_velocity) < 1:
             self.state = 2
-            self.time_stamp = time.time()
-        elif self.state == 2 and time.time() > self.time_stamp + self.rehab.exercise_para_dict['hold_time'] :
+            self.time_stamp_hold = time.time()
+        elif self.state == 2 and time.time() > self.time_stamp_hold + self.rehab.exercise_para_dict['hold_time'] :
             # if abs(self.resistance_moment_memory - self.desired_resistance_moment) < 0.1:
             self.state = 3
             
             self.repeatation_memory += 1
         elif self.state == 3 and self.moment_state == 1:
             self.signal = 1
-            self.time_stamp = time.time()
+            self.time_stamp_move = time.time()
             self.state = 1
 
         if self.repeatation_memory >= self.rehab.exercise_para_dict['repeatation_number']:
@@ -169,8 +170,8 @@ class Resistance_rehab:
         else:
             self.sign =  - 1
 
-        t = time.time() - self.time_stamp
-        if self.state == 1:
+        t = time.time() - self.time_stamp_move
+        if self.state == 1 or self.state == 2:
             if t <= t_rise:  # 가속 구간
                 des_dis = (v_max / (2 * t_rise)) * t**2
                 

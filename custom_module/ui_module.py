@@ -20,7 +20,7 @@ class RehabWindow(QMainWindow):
 
         self.ui = uic.loadUi('UI/rehab_gui.ui', self)
 
-        self.move(0,1920)
+        self.move(0,1000)
         self.initUI()
         time.sleep(0.5)
 

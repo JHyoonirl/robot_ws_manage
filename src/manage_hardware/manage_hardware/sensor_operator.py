@@ -72,7 +72,20 @@ class Sensor(Node):
         
         # 데이터 발행
         self.force_publisher.publish(force_msg)
-        self.torque_publisher.publish(torque_msg)
+        
+        # Apply low-pass filter to torque data
+        alpha_torque = 0.2  # Low-pass filter coefficient for torque
+
+        if not hasattr(self, 'smoothed_torque'):
+            self.smoothed_torque = Vector3()
+
+        # Smooth each component of torque data
+        self.smoothed_torque.x = alpha_torque * torque_msg.x + (1 - alpha_torque) * self.smoothed_torque.x
+        self.smoothed_torque.y = alpha_torque * torque_msg.y + (1 - alpha_torque) * self.smoothed_torque.y
+        self.smoothed_torque.z = alpha_torque * torque_msg.z + (1 - alpha_torque) * self.smoothed_torque.z
+
+        # Publish the smoothed torque data
+        self.torque_publisher.publish(self.smoothed_torque)
     
     def data_process(self):
         while True:
@@ -123,7 +136,20 @@ class Sensor(Node):
                             
                             # 데이터 발행
                             self.force_publisher.publish(force_msg)
-                            self.torque_publisher.publish(torque_msg)
+                            
+                            # Apply low-pass filter to torque data
+                            alpha_torque = 0.2  # Low-pass filter coefficient for torque
+
+                            if not hasattr(self, 'smoothed_torque'):
+                                self.smoothed_torque = Vector3()
+
+                            # Smooth each component of torque data
+                            self.smoothed_torque.x = alpha_torque * torque_msg.x + (1 - alpha_torque) * self.smoothed_torque.x
+                            self.smoothed_torque.y = alpha_torque * torque_msg.y + (1 - alpha_torque) * self.smoothed_torque.y
+                            self.smoothed_torque.z = alpha_torque * torque_msg.z + (1 - alpha_torque) * self.smoothed_torque.z
+
+                            # Publish the smoothed torque data
+                            self.torque_publisher.publish(self.smoothed_torque)
                             # self.sensor_time.publish(time_msg)
                         time.sleep(0.0005)
                     else:
@@ -141,7 +167,7 @@ class SensorApp(QMainWindow):
         
         self.force_data = [[], [], []]  # 각 축의 힘 데이터를 저장하는 리스트
         self.torque_data = [[], [], []]  # 각 축의 토크 데이터를 저장하는 리스트
-        self.move(1400, 1920)
+        self.move(1400, 1000)
         self.show()
 
     def init_ui(self):

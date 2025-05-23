@@ -10,11 +10,14 @@ class Assistance_rehab:
     def __init__(self, rehab:Rehab_program):
         
         self.rehab = rehab
-        self.time_stamp = 0
+        self.time_stamp_move = 0
+        self.time_stamp_hold = 0
 
         self.desired_position_end = 0
         self.desired_position_start = 0
         self.dtheta_desired_current = 0
+
+        self.assistance_velocity_min = 0
 
         self.desired_angle = 0
         self.current_position = self.rehab.imu_knee_angle_deg
@@ -122,16 +125,16 @@ class Assistance_rehab:
         if self.state == 0:
             self.signal = 1
             self.state = 1
-            self.time_stamp = time.time()
+            self.time_stamp_move = time.time()
             self.desired_angle = self.current_position
             
-        elif self.state == 1 and abs(self.desired_position_end - self.current_position) < 2 and abs(self.current_velocity) < 1:
+        elif self.state == 1 and abs(self.desired_position_end - self.current_position) < 5 and abs(self.current_velocity) < 1:
             self.state = 2
-            self.time_stamp = time.time()
-        elif self.state == 2 and time.time() > self.time_stamp + self.rehab.exercise_para_dict['hold_time']:
+            self.time_stamp_hold = time.time()
+        elif self.state == 2 and time.time() > self.time_stamp_hold + self.rehab.exercise_para_dict['hold_time']:
             self.state = 1
             self.signal = 1
-            self.time_stamp = time.time()
+            self.time_stamp_move = time.time()
             self.repeatation_memory += 1
         if self.repeatation_memory >= self.rehab.exercise_para_dict['repeatation_number']:
             self.state = 3
@@ -155,6 +158,50 @@ class Assistance_rehab:
             # desired position을 설정하고 나서 signal 다시 0으로 초기화
             self.signal = 0
 
+    def desired_velocity_profile_generator(self):
+        '''
+        Passive mode에서 시간에 따른 프로파일 생성
+        '''
+        time_now = time.time() - self.time_stamp_move
+        self.dt = time.time() - self.rehab.past_time
+        acc_calculated = 0
+        distance = abs(self.desired_position_end - self.desired_position_start)
+        # constant_vel_time = distance/self.rehab.dThetaMax - self.rehab.acc_time
+
+        
+        
+        constant_vel_time = distance/self.dTheta - self.dTheta/self.ddTheta
+        acc_vel_time = self.dTheta/self.ddTheta
+        # Acc = self.rehab.dThetaMax
+        if self.state == 1 or self.state == 2:
+                
+            if self.desired_position_end < self.desired_position_start:
+                if time_now < acc_vel_time:
+                    self.dtheta_desired_current = - time_now*self.ddTheta
+
+                elif time_now < constant_vel_time + acc_vel_time:
+                    self.dtheta_desired_current =  - self.dTheta
+
+                elif time_now < constant_vel_time + 2*acc_vel_time:
+                    self.dtheta_desired_current = - self.dTheta + (time_now - (constant_vel_time + acc_vel_time))*self.ddTheta
+
+                else:
+                    self.dtheta_desired_current = 0
+            else:
+                if time_now < self.dTheta/self.ddTheta:
+                    self.dtheta_desired_current = time_now*self.ddTheta
+
+                elif time_now < constant_vel_time + self.dTheta/self.ddTheta:
+                    self.dtheta_desired_current = self.dTheta
+
+                elif time_now < constant_vel_time + 2*self.dTheta/self.ddTheta:
+                    self.dtheta_desired_current = self.dTheta - (time_now - (constant_vel_time + acc_vel_time))*self.ddTheta
+
+                else:
+                    self.dtheta_desired_current = 0
+
+        elif self.state == 2:
+            self.dtheta_desired_current = 0
     
     def desired_position_and_velocity_trajectory_generator(self):
         '''
@@ -179,7 +226,7 @@ class Assistance_rehab:
         else:
             sign =  - 1
 
-        t = time.time() - self.time_stamp
+        t = time.time() - self.time_stamp_move
         if self.state == 1:
             if t <= t_rise:  # 가속 구간
                 des_dis = (v_max / (2 * t_rise)) * t**2
@@ -196,12 +243,12 @@ class Assistance_rehab:
                 des_dis = distance
 
             if t <= t_rise:
-                self.dtheta_desired_current = 0
+                self.assistance_velocity_min = 0
             else:
                 if sign > 0:
-                    self.dtheta_desired_current = (v_max - 3)
+                    self.assistance_velocity_min = (v_max - 3)
                 else:
-                    self.dtheta_desired_current = - (v_max - 3)
+                    self.assistance_velocity_min = - (v_max - 3)
         else:
             des_dis = distance
         self.desired_angle = self.desired_position_start + sign * des_dis
