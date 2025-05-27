@@ -242,7 +242,7 @@ class Assistance_rehab:
             else:
                 des_dis = distance
 
-            if t <= t_rise:
+            if t <= t_rise + 3:
                 self.assistance_velocity_min = 0
             else:
                 if sign > 0:
