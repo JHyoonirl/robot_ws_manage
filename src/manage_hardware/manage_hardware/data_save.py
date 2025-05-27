@@ -30,7 +30,8 @@ class DataSaver(Node):
         self.force_x = self.force_y = self.force_z = 0.0
         self.torque_x = self.torque_y = self.torque_z = 0.0
 
-        self.thruster_moment, self.added_mass, self.drag = 0.0, 0.0, 0.0
+        self.thruster_total_moment, self.added_mass, self.drag = 0.0, 0.0, 0.0
+        self.thruster_generate_torque = 0
 
         self.desired_position, self.knee_angle, self.imu_velocity, self.imu_acceleration = 0.0, 0.0, 0.0, 0.0
         
@@ -96,6 +97,12 @@ class DataSaver(Node):
             'Motor_info',
             self.motor_subscriber,
             self.qos_profile_)
+        
+        self.thruster_total_moment_sub = self.create_subscription(
+            Float64,
+            'thruster_total_moment',
+            self.thruster_total_subscriber,
+            self.qos_profile)
         
         self.thruster_sub = self.create_subscription(
             Float64,
@@ -187,14 +194,17 @@ class DataSaver(Node):
 
     def thruster_subscriber(self, msg: Float64):
         # with self.data_lock:
-        self.thruster_moment = msg.data
+        self.thruster_generate_torque = msg.data
         self.thruster_moment_timestamp = time.time()
         if self.saving_status and self.thruster_status == True:
             dt_object = datetime.datetime.fromtimestamp(self.thruster_moment_timestamp)
             formatted_time = dt_object.strftime('%H:%M:%S.%f')[:-3]  # .%f는 마이크로세컨드까지 포함하므로, 마지막 3자리를 잘라 밀리세컨드로 사용
 
-            data_entry = [formatted_time, self.thruster_moment, self.added_mass, self.drag]
+            data_entry = [formatted_time, self.thruster_total_moment, self.thruster_generate_torque, self.added_mass, self.drag]
             self.data_sheet_thruster.append(data_entry)
+
+    def thruster_total_subscriber(self, msg: Float64):
+        self.thruster_total_moment = msg.data
 
     def added_mass_subscriber(self, msg: Float64):
         self.added_mass = msg.data
@@ -237,8 +247,9 @@ class DataSaver(Node):
 
     def passive_muscle_callback(self, msg: Float64):
         self.passive_moment = msg.data
+        self.passive_moment_timestamp = time.time()
         if self.saving_status and self.sensor_status == True:
-            dt_object = datetime.datetime.fromtimestamp(self.passive_moment)
+            dt_object = datetime.datetime.fromtimestamp(self.passive_moment_timestamp)
             formatted_time = dt_object.strftime('%H:%M:%S.%f')[:-3]
             
             data_entry = [formatted_time, self.passive_moment, self.active_moment]
@@ -346,7 +357,7 @@ class DataSaveApp(QMainWindow):
     def update_data(self):
         # with self.node.data_lock:
         if self.node.thruster_status == True:
-            self.Thruster_data_text.setPlainText(f'{self.node.thruster_moment:.2f}')
+            self.Thruster_data_text.setPlainText(f'{self.node.thruster_total_moment:.2f}')
         else:
             self.Thruster_data_text.clear()
 
@@ -418,7 +429,7 @@ class DataSaveApp(QMainWindow):
                 with pd.ExcelWriter(full_filename, engine='openpyxl') as writer:
                     # 각 데이터 저장 여부에 따라 DataFrame 생성 및 시트로 저장
                     if self.node.thruster_status and self.node.data_sheet_thruster:
-                        df_thruster = pd.DataFrame(self.node.data_sheet_thruster, columns=['Time', 'thruster_moment', 'added_mass', 'drag'])
+                        df_thruster = pd.DataFrame(self.node.data_sheet_thruster, columns=['Time', 'thruster_total_moment','thruster_moment', 'added_mass', 'drag'])
                         df_thruster.to_excel(writer, sheet_name='Thruster', index=False)
                     if self.node.data_sheet_trajectory:
                         df_trajectory = pd.DataFrame(self.node.data_sheet_trajectory, columns=['Time', 'desired_position', 'desired_velocity', 'state','angle', 'velocity', 'acceleration', 'assistance_velocity_min', 'resistance_moment'])

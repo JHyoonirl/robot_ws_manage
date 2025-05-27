@@ -66,7 +66,7 @@ class Resistance_rehab:
         #### resistance parameter
         self.resistance_moment = self.rehab.resistance_para_dict['resistance_moment']
         self.resistance_moment_memory = 0.0
-        self.resistance_moment_variation = 1
+        self.resistance_moment_variation = 0.5
         self.desired_resistance_moment = 0.0
         self.desired_resistance_moment_prev = 0.0
 
@@ -144,10 +144,52 @@ class Resistance_rehab:
                 self.desired_position_end = self.rehab.exercise_para_dict['rom_upper']
 
             # desired position을 설정하고 나서 signal 다시 0으로 초기화
-            self.signal = 0 
+            self.signal = 0
+
+    def desired_velocity_profile_generator(self):
+        time_now = time.time() - self.time_stamp_move
+        self.dt = time.time() - self.rehab.past_time
+        acc_calculated = 0
+        distance = abs(self.desired_position_end - self.desired_position_start)
+        # constant_vel_time = distance/self.rehab.dThetaMax - self.rehab.acc_time
+
+        
+        
+        constant_vel_time = distance/self.dTheta - self.dTheta/self.ddTheta
+        acc_vel_time = self.dTheta/self.ddTheta
+        # Acc = self.rehab.dThetaMax
+        if self.state == 1 or self.state == 2:
+                
+            if self.desired_position_end < self.desired_position_start:
+                if time_now < acc_vel_time:
+                    self.dtheta_desired_current = - time_now*self.ddTheta
+
+                elif time_now < constant_vel_time + acc_vel_time:
+                    self.dtheta_desired_current =  - self.dTheta
+
+                elif time_now < constant_vel_time + 2*acc_vel_time:
+                    self.dtheta_desired_current = - self.dTheta + (time_now - (constant_vel_time + acc_vel_time))*self.ddTheta
+
+                else:
+                    self.dtheta_desired_current = 0
+            else:
+                if time_now < self.dTheta/self.ddTheta:
+                    self.dtheta_desired_current = time_now*self.ddTheta
+
+                elif time_now < constant_vel_time + self.dTheta/self.ddTheta:
+                    self.dtheta_desired_current = self.dTheta
+
+                elif time_now < constant_vel_time + 2*self.dTheta/self.ddTheta:
+                    self.dtheta_desired_current = self.dTheta - (time_now - (constant_vel_time + acc_vel_time))*self.ddTheta
+
+                else:
+                    self.dtheta_desired_current = 0
+
+        elif self.state == 2:
+            self.dtheta_desired_current = 0
 
     
-    def desired_position_and_velocity_trajectory_generator(self):
+    def desired_position_trajectory_generator(self):
         '''
         Passive mode에서 desired_velocity에 의한 위치 프로파일 생성
         오일러 적분으로 진행
@@ -174,20 +216,25 @@ class Resistance_rehab:
         if self.state == 1 or self.state == 2:
             if t <= t_rise:  # 가속 구간
                 des_dis = (v_max / (2 * t_rise)) * t**2
+                # self.dtheta_desired_current = self.sign * self.ddTheta * (t - t_rise)
                 
             elif t <= t_rise + t_high:  # 등속 구간
                 x_rise = (v_max / (2 * t_rise)) * t_rise**2  # 상승 구간 끝 위치
                 des_dis =  x_rise + v_max * (t - t_rise)
+                # self.dtheta_desired_current = self.sign * self.dTheta
             elif t <= t_total:  # 감속 구간
                 x_rise = (v_max / (2 * t_rise)) * t_rise**2  # 상승 구간 끝 위치
                 x_high = x_rise + v_max * t_high  # 등속 구간 끝 위치
                 t_fall_start = t_rise + t_high
                 des_dis = x_high + (v_max * (t - t_fall_start)) - (v_max / (2 * t_fall)) * (t - t_fall_start)**2
+                # self.dtheta_desired_current = self.sign * (self.dTheta - (self.ddTheta * (t - t_fall_start)))
             else:
+                # self.dtheta_desired_current = 0
                 des_dis = distance
 
-            self.dtheta_desired_current = self.sign * self.dTheta
+            # self.dtheta_desired_current = self.sign * self.dTheta
         else:
+            # self.dtheta_desired_current = 0
             des_dis = distance
         self.desired_angle = self.desired_position_start + self.sign * des_dis
 

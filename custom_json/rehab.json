@@ -1,16 +1,16 @@
 {
     "exercise_parameter": {
-        "desired_velocity": 25.0,
-        "desired_acceleration": 25.0,
+        "desired_velocity": 20.0,
+        "desired_acceleration": 20.0,
         "repeatation_number": 10,
         "hold_time": 5.0,
         "rom_upper": 120.0,
-        "rom_lower": 45.0
+        "rom_lower": 40.0
     },
     "passive_parameter": {
-        "passive_p": 11.0,
-        "passive_i": 32.5,
-        "passive_d": 3.75
+        "passive_p": 5.0,
+        "passive_i": 10.0,
+        "passive_d": 3.25
     },
     "assistance_parameter": {
         "assistance_gain_k": 3.0,
@@ -18,14 +18,14 @@
         "assistance_i": 20.0,
         "assistance_d": 0.0,
         "assistance_muscle_p": 120.0,
-        "assistance_muscle_i": 60.0,
+        "assistance_muscle_i": 80.0,
         "assistance_muscle_d": 0.0
     },
     "resistance_parameter": {
-        "resistance_moment": 2.0,
-        "resistance_muscle_p": 600.0,
-        "resistance_muscle_i": 350.0,
-        "resistance_muscle_d": 0.0
+        "resistance_moment": 1.5,
+        "resistance_muscle_p": 1900.0,
+        "resistance_muscle_i": 250.0,
+        "resistance_muscle_d": 425.0
     },
     "motor_setting_parameter": {
         "rom_safe_upper": 150.0,

@@ -128,7 +128,7 @@ class Assistance_rehab:
             self.time_stamp_move = time.time()
             self.desired_angle = self.current_position
             
-        elif self.state == 1 and abs(self.desired_position_end - self.current_position) < 5 and abs(self.current_velocity) < 1:
+        elif self.state == 1 and abs(self.desired_position_end - self.current_position) < 15 and abs(self.current_velocity) < 1:
             self.state = 2
             self.time_stamp_hold = time.time()
         elif self.state == 2 and time.time() > self.time_stamp_hold + self.rehab.exercise_para_dict['hold_time']:

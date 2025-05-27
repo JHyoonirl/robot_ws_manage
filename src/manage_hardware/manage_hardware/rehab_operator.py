@@ -355,7 +355,8 @@ class Rehab_program(Node):
                 self.Resistance_rehab_module.current_position = self.imu_knee_angle_deg
                 self.Resistance_rehab_module.control_generator()
                 self.Resistance_rehab_module.desired_position_generator()
-                self.Resistance_rehab_module.desired_position_and_velocity_trajectory_generator()
+                self.Resistance_rehab_module.desired_velocity_profile_generator()
+                self.Resistance_rehab_module.desired_position_trajectory_generator()
                 self.Resistance_rehab_module.resistance_moment_generator_fcn()
 
                 self.desired_trajectory_position = self.Resistance_rehab_module.desired_angle
