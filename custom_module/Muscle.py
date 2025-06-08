@@ -24,7 +24,7 @@ class Muscle:
         False: Only for involuntary / True: Control with voluntary
         '''
 
-        self.LSB_torque_constant = 45
+        self.LSB_torque_constant = 30
 
 
     def M_stiffness(self, angle):

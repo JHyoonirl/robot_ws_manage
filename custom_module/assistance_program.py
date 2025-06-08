@@ -227,7 +227,7 @@ class Assistance_rehab:
             sign =  - 1
 
         t = time.time() - self.time_stamp_move
-        if self.state == 1:
+        if self.state == 1 or self.state == 2:
             if t <= t_rise:  # 가속 구간
                 des_dis = (v_max / (2 * t_rise)) * t**2
                 
@@ -242,7 +242,7 @@ class Assistance_rehab:
             else:
                 des_dis = distance
 
-            if t <= t_rise + 3:
+            if t <= t_rise:
                 self.assistance_velocity_min = 0
             else:
                 if sign > 0:

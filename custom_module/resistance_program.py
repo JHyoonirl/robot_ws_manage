@@ -24,9 +24,10 @@ class Resistance_rehab:
         '''
         self.dtheta_desired_current = 0
 
-        self.desired_angle = 0
+        
         self.current_position = self.rehab.imu_knee_angle_deg
-        '''
+        self.desired_angle = self.current_position
+        '''s
         unit: [deg]
         '''
         self.current_velocity = self.rehab.imu_knee_velocity_deg
@@ -65,24 +66,11 @@ class Resistance_rehab:
         
         #### resistance parameter
         self.resistance_moment = self.rehab.resistance_para_dict['resistance_moment']
+        self.moment_state = 0
         self.resistance_moment_memory = 0.0
         self.resistance_moment_variation = 0.5
         self.desired_resistance_moment = 0.0
         self.desired_resistance_moment_prev = 0.0
-
-    def Passive_exercise(self):
-        '''
-        Passive mode 진행 프로토콜을 Main loop로 실행되는 부분
-        '''
-        self.current_position = self.rehab.imu_knee_angle_deg
-        
-        self.control_generator()
-        self.desired_position_generator()
-        self.desired_velocity_profile_generator()
-        self.desired_position_trajectory_generator()
-        # self.current_position = self.desired_angle
-        # print(self.desired_position_start, self.desired_position_end)
-        return self.desired_angle, self.dtheta_desired_current
 
     def resistance_exercise(self):
         '''
@@ -106,11 +94,15 @@ class Resistance_rehab:
         self.ddTheta = self.rehab.exercise_para_dict['desired_acceleration']
         
         if self.state == 0:
-            self.signal = 1
-            self.state = 1
-            self.time_stamp_move = time.time()
+            self.signal = 1          
+            # self.time_stamp_move = time.time()
             self.desired_angle = self.current_position
-            
+            self.state = 0.5
+        elif self.state == 0.5:
+            if self.moment_state == 1:
+                self.state = 1
+                self.time_stamp_move = time.time()
+
         elif self.state == 1 and abs(self.desired_position_end - self.current_position) < 10 and abs(self.current_velocity) < 1:
             self.state = 2
             self.time_stamp_hold = time.time()
@@ -184,8 +176,7 @@ class Resistance_rehab:
 
                 else:
                     self.dtheta_desired_current = 0
-
-        elif self.state == 2:
+        else:
             self.dtheta_desired_current = 0
 
     
@@ -233,6 +224,9 @@ class Resistance_rehab:
                 des_dis = distance
 
             # self.dtheta_desired_current = self.sign * self.dTheta
+        elif self.state == 0.5:
+            des_dis = 0
+            # self.dtheta_desired_current = 0
         else:
             # self.dtheta_desired_current = 0
             des_dis = distance
@@ -262,7 +256,7 @@ class Resistance_rehab:
         else:
             self.resistance_moment_memory = self.desired_resistance_moment
 
-        if self.state == 3 and self.resistance_moment_memory == self.desired_resistance_moment:
+        if (self.state == 3 or self.state == 0.5) and self.resistance_moment_memory == self.desired_resistance_moment:
             self.moment_state = 1
         
         return self.resistance_moment_memory

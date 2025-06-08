@@ -43,6 +43,7 @@ class DataSaver(Node):
 
         self.passive_moment = 0.0
         self.active_moment = 0.0
+        self.desired_velocity_sine = 0.0
         # self.prev_pwm = None
         # self.prev_force = (None, None, None)
         # self.prev_torque = (None, None, None)
@@ -181,6 +182,12 @@ class DataSaver(Node):
             'Active_moment',
             self.active_muscle_callback,
             self.qos_profile)
+        
+        self.sine_velocity_subscriber = self.create_subscription(
+            Float64,
+            'Sine_velocity',
+            self.sine_velocity_callback,
+            self.qos_profile)
 
         # Updated motor_info structure
         self.voltage = 0.0
@@ -258,6 +265,10 @@ class DataSaver(Node):
     def active_muscle_callback(self, msg: Float64):
         self.active_moment = msg.data
 
+    def sine_velocity_callback(self, msg: Float64):
+        self.desired_velocity_sine = msg.data
+        
+
     def force_subscriber(self, msg):
         # with self.data_lock:
         self.force_x, self.force_y, self.force_z = msg.x, msg.y, msg.z
@@ -290,10 +301,10 @@ class DataSaver(Node):
         if self.saving_status and self.motor_status == True:
             dt_object = datetime.datetime.fromtimestamp(self.motor_timestamp)
             formatted_time = dt_object.strftime('%H:%M:%S.%f')[:-3]
-            'Time', 'voltage', 'torque_current', 'angle', 'velocity'
+            # 'Time', 'voltage', 'torque_current', 'angle', 'velocity', 'sine_velocity'
             data_entry = [
                 formatted_time, self.voltage, self.torque_current,
-                self.motor_knee_angle, self.motor_velocity 
+                self.motor_knee_angle, self.motor_velocity, self.desired_velocity_sine
             ]
             self.data_sheet_motor.append(data_entry)
             # self.get_logger().info("{0}".format(data_entry))
@@ -307,7 +318,7 @@ class DataSaveApp(QMainWindow):
         self.thruster_signal = 0.0
         self.ui = uic.loadUi('UI/data_save.ui', self)
         self.init_ui()
-        self.move(850,1000)
+        self.move(850,1200)
         
         self.show()
 
@@ -444,7 +455,7 @@ class DataSaveApp(QMainWindow):
                         df_torque = pd.DataFrame(self.node.data_sheet_torque, columns=['Time', 'Torque_X', 'Torque_Y', 'Torque_Z'])
                         df_torque.to_excel(writer, sheet_name='Torque', index=False)
                     if self.node.motor_status and self.node.data_sheet_motor:
-                        df_motor = pd.DataFrame(self.node.data_sheet_motor, columns=['Time', 'voltage', 'torque_current', 'angle', 'velocity'])
+                        df_motor = pd.DataFrame(self.node.data_sheet_motor, columns=['Time', 'voltage', 'torque_current', 'angle', 'velocity', 'sine_velocity'])
                         df_motor.to_excel(writer, sheet_name='Motor', index=False)
 
                 print(f"Data saved to {full_filename}")

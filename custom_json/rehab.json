@@ -9,23 +9,23 @@
     },
     "passive_parameter": {
         "passive_p": 5.0,
-        "passive_i": 10.0,
+        "passive_i": 13.0,
         "passive_d": 3.25
     },
     "assistance_parameter": {
-        "assistance_gain_k": 3.0,
-        "assistance_p": 10.0,
-        "assistance_i": 20.0,
+        "assistance_gain_k": 5.0,
+        "assistance_p": 2.0,
+        "assistance_i": 3.0,
         "assistance_d": 0.0,
-        "assistance_muscle_p": 120.0,
-        "assistance_muscle_i": 80.0,
-        "assistance_muscle_d": 0.0
+        "assistance_muscle_p": 450.0,
+        "assistance_muscle_i": 120.0,
+        "assistance_muscle_d": 150.0
     },
     "resistance_parameter": {
-        "resistance_moment": 1.5,
+        "resistance_moment": 2.0,
         "resistance_muscle_p": 1900.0,
         "resistance_muscle_i": 250.0,
-        "resistance_muscle_d": 425.0
+        "resistance_muscle_d": 300.0
     },
     "motor_setting_parameter": {
         "rom_safe_upper": 150.0,
@@ -35,7 +35,7 @@
     "hydrodynamic_parameter": {
         "test_velocity_input": 20.0,
         "test_omega_input": 1.0,
-        "test_p_input": 75.0,
+        "test_p_input": 10.0,
         "test_i_input": 1.0,
         "test_d_input": 0.0,
         "test_rom_upper_input": 135.0,
@@ -43,8 +43,8 @@
         "test_hold_time_input": 4.0
     },
     "const_angle_parameter": {
-        "const_angle_p": 25.0,
-        "const_angle_i": 25.0,
+        "const_angle_p": 5,
+        "const_angle_i": 5,
         "const_angle_d": 0.0
     }
 }

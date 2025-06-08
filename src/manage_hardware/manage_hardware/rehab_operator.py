@@ -40,7 +40,7 @@ class Rehab_program(Node):
 
 
         with open("custom_json/rehab.json", "r") as fr:
-            rehab_data = json. load(fr)
+            rehab_data = json.load(fr)
 
         exercise_parameter = rehab_data['exercise_parameter']
         passive_parameter = rehab_data['passive_parameter']
@@ -307,6 +307,7 @@ class Rehab_program(Node):
     def rehab_program_loop(self):
         self.control_mode = self.exercise_info_dict['control_mode']
         self.control_active = self.exercise_info_dict['control_active']
+        self.get_logger().info(f"Control Mode: {self.control_mode}, Control Active: {self.control_active}")
         if self.control_mode == 3: # passive mode
             if self.control_active == 0:
                 self.Passive_rehab_module.state = 0
@@ -326,9 +327,12 @@ class Rehab_program(Node):
                 
         elif self.control_mode == 4: # assistance mode
             if self.control_active == 0:
+                self.Assistance_rehab_module.current_position = self.imu_knee_angle_deg
+                self.Assistance_rehab_module.desired_angle = self.imu_knee_angle_deg
                 self.Assistance_rehab_module.state = 0
                 self.Assistance_rehab_module.repeatation_memory = 0
                 self.desired_trajectory_position = self.Assistance_rehab_module.desired_angle
+                # self.get_logger().info(f"Assistance rehab module: {self.desired_trajectory_position}")
                 self.desired_trajectory_velocity = 0
                 self.desired_trajectory_state = self.Assistance_rehab_module.state
             else:
@@ -344,10 +348,13 @@ class Rehab_program(Node):
             
         elif self.control_mode == 5: # resistance mode
             if self.control_active == 0:
+                self.Resistance_rehab_module.current_position = self.imu_knee_angle_deg
+                self.Resistance_rehab_module.desired_angle = self.imu_knee_angle_deg
                 self.Resistance_rehab_module.moment_init()
                 self.Resistance_rehab_module.state = 0
                 self.Resistance_rehab_module.repeatation_memory = 0
                 self.desired_trajectory_position = self.Resistance_rehab_module.desired_angle
+                self.get_logger().info(f"Resistance rehab module: {self.desired_trajectory_position}")
                 self.desired_trajectory_velocity = 0
                 self.desired_trajectory_state = self.Resistance_rehab_module.state
                 # self.resistance_moment = 0.0

@@ -69,6 +69,7 @@ class Motor(Node):
 
         self.passive_moment_publisher = self.create_publisher(Float64, 'Passive_moment', self.qos_profile)
         self.active_moment_publisher = self.create_publisher(Float64, 'Active_moment', self.qos_profile)
+        self.sine_velocity_publisher = self.create_publisher(Float64, 'Sine_velocity', self.qos_profile)
         
         
         # Subscribers
@@ -139,6 +140,7 @@ class Motor(Node):
         self.motor_velocity_prev = 0.0
         self.motor_angle = 0.0     # Motor angle
         self.motor_knee_angle = 0.0 # Motor knee angle
+        self.sine_velocity = 0.0
 
         #####
         #imu varialbles
@@ -246,6 +248,7 @@ class Motor(Node):
         self.motor_info_pub() # motor 상태 정보 publish
         self.passive_moment_pub() # passive moment publish
         self.active_moment_pub() # active moment publish
+        self.sine_velocity_publisher.publish(Float64(data=float(self.sine_velocity))) # sine velocity publish
         status = self.motor_control()
     
     def motor_info_pub(self):
@@ -464,6 +467,7 @@ class Motor(Node):
 
         elif state == 1:
             desired_velocity = self.test_desired_input
+            self.sine_velocity = desired_velocity
             '''
             unit [deg/s]
             '''
